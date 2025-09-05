@@ -48,6 +48,9 @@ pub fn main() {
                     Keycode::Right | Keycode::D => {
                         intersection.add_car_in(Direction::East, &car_texture);
                     }
+                    Keycode::R => {
+                        intersection.add_car_in_rnd(&car_texture);
+                    }
                     _ => {} // Ignore other keys
                 },
 

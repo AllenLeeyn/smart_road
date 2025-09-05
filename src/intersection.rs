@@ -40,6 +40,15 @@ impl<'a> Intersection<'a> {
         Intersection { cars_in, cars_out: Vec::new() }
     }
 
+    pub fn add_car_in_rnd(&mut self, texture: &'a Texture<'a>) {
+        let mut rng = rng();
+        let directions = [
+            Direction::North, Direction::South,
+            Direction::East, Direction::West];
+        let direction = *directions.choose(&mut rng).unwrap();
+        self.add_car_in(direction, &texture);
+    }
+
     pub fn add_car_in(&mut self, direction: Direction, texture: &'a Texture<'a>) {
         let mut rng = rng();
         let routes = [Route::Left, Route::Right, Route::Straight];
