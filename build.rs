@@ -10,4 +10,8 @@ fn main() {
         .expect("Set SDL2_IMAGE_LIB_PATH env variable");
     println!("cargo:rustc-link-search=native={}", img_lib_path);
     println!("cargo:rustc-link-lib=SDL2_image");
+
+    // Link to SDL2_ttf
+    println!("cargo:rustc-link-search=native={}", lib_path);
+    println!("cargo:rustc-link-lib=SDL2_ttf");
 }

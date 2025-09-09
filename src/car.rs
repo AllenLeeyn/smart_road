@@ -2,8 +2,10 @@ use sdl2::render::{Canvas, Texture};
 use sdl2::rect::Rect;
 use sdl2::video::Window;
 use crate::intersection::{Route, Direction};
+use std::time::SystemTime;
 
 pub struct Car<'a> {
+    pub id: String,
     pub x: i32,
     pub y: i32,
     pub width: u32,
@@ -14,18 +16,30 @@ pub struct Car<'a> {
     pub direction: Direction,
     pub turned: bool,
     pub exited: bool,
+
+    pub time_enter: SystemTime,
+    pub time_exit: Option<SystemTime>,
+    pub dist: i32,
 }
 
 impl<'a> Car<'a> {
     pub fn new(
-        x: i32, y: i32, width: u32, height: u32,
+        id: String, x: i32, y: i32, width: u32, height: u32,
         speed: i32, texture: &'a Texture<'a>,
         route: Route, direction: Direction,
     ) -> Self {
+        let dist = match route {
+            Route::Right => 650,
+            Route::Straight => 900,
+            Route::Left => 950,
+        };
+
         Car {
-            x, y, width, height,
+            id, x, y, width, height,
             speed, texture,
             route, direction, turned: false, exited: false,
+            time_enter: SystemTime::now(), time_exit: None,
+            dist
         }
     }
 
@@ -47,14 +61,16 @@ impl<'a> Car<'a> {
             Direction::South if self.y >= 900 => {
                 self.exited = true;
             }
-            Direction::West if self.x + self.width as i32 <= 0 => {
+            Direction::West if self.x + self.height as i32 <= 0 => {
                 self.exited = true;
             }
-            Direction::East if self.x >= 900 => {
+            Direction::East if self.x >= 900 + self.height as i32 => {
                 self.exited = true;
             }
             _ => {}
         }
+
+        if self.exited { self.time_exit = Some(SystemTime::now()); }
     }
 
     fn update_straight(&mut self) {

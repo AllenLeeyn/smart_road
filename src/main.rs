@@ -1,12 +1,13 @@
 mod car;
+mod cars_id;
 mod intersection;
-use crate::intersection::{Intersection, Direction};
+mod crossing_manager;
+use intersection::{Intersection, Direction};
 
 use sdl2::image::{InitFlag, LoadTexture};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use std::time::Duration;
-
  
 pub fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -23,19 +24,23 @@ pub fn main() {
     
     // Load the background texture
     let texture_creator = canvas.texture_creator();
-    let bg_texture = texture_creator.load_texture("bg.png").unwrap();
-    let car_texture = texture_creator.load_texture("car.png").unwrap();
-
+    let bg_texture = texture_creator.load_texture("assets/bg.png").unwrap();
+    let car_texture = texture_creator.load_texture("assets/car.png").unwrap();
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut intersection = Intersection::new();
     'running: loop {
-        for event in event_pump.poll_iter() {
+        let events: Vec<_> = event_pump.poll_iter().collect();
+
+        for event in events {
             match event {
                 Event::Quit { .. } => break 'running,
 
                 Event::KeyDown { keycode: Some(key), .. } => match key {
-                    Keycode::Escape => break 'running,
+                    Keycode::Escape => { 
+                        show_statistics(&intersection, &sdl_context, &mut event_pump);
+                        break 'running
+                    },
                     Keycode::Down | Keycode::S => {
                         intersection.add_car_in(Direction::South, &car_texture);
                     }
@@ -66,5 +71,56 @@ pub fn main() {
         canvas.present();
 
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+    }
+}
+
+use sdl2::ttf::Font;
+use sdl2::pixels::Color;
+use sdl2::render::Canvas;
+use sdl2::video::Window;
+use sdl2::rect::Rect;
+
+fn show_statistics(
+    intersection: &Intersection,
+    sdl_context: &sdl2::Sdl,
+    event_pump: &mut sdl2::EventPump,) {
+    let video_subsystem = sdl_context.video().unwrap();
+    let ttf_context = sdl2::ttf::init().unwrap();
+
+    let window = video_subsystem
+        .window("Statistics", 400, 400)
+        .position_centered()
+        .build()
+        .unwrap();
+
+    let mut canvas: Canvas<Window> = window.into_canvas().build().unwrap();
+    let texture_creator = canvas.texture_creator();
+
+    let font_path = "assets/Roboto-Regular.ttf"; // Change if needed
+    let font: Font = ttf_context.load_font(font_path, 20).unwrap();
+
+    let stats_text = intersection.get_statistics(); // should return String
+
+    let surface = font
+        .render(&stats_text)
+        .blended_wrapped(Color::WHITE, 380)
+        .unwrap();
+
+    let texture = texture_creator.create_texture_from_surface(&surface).unwrap();
+    let target = Rect::new(10, 10, surface.width(), surface.height());
+
+    canvas.set_draw_color(Color::RGB(30, 30, 30));
+    canvas.clear();
+    canvas.copy(&texture, None, Some(target)).unwrap();
+    canvas.present();
+
+    'stat_loop: loop {
+        for event in event_pump.poll_iter() {
+            match event {
+            Event::Quit { .. } => break 'stat_loop,
+            Event::KeyDown { keycode: Some(Keycode::Escape), .. } => break 'stat_loop,
+                _ => {}
+            }
+        }
     }
 }
