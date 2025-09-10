@@ -12,6 +12,8 @@ fn main() {
     println!("cargo:rustc-link-lib=SDL2_image");
 
     // Link to SDL2_ttf
-    println!("cargo:rustc-link-search=native={}", lib_path);
+    let ttf_lib_path = std::env::var("SDL2_TTF_LIB_PATH")
+        .expect("Set SDL2_IMAGE_LIB_PATH env variable");
+    println!("cargo:rustc-link-search=native={}", ttf_lib_path);
     println!("cargo:rustc-link-lib=SDL2_ttf");
 }
