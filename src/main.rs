@@ -1,6 +1,7 @@
 mod car;
 mod cars_id;
 mod intersection;
+mod crossing_manager;
 use intersection::{Intersection, Direction};
 
 use sdl2::image::{InitFlag, LoadTexture};

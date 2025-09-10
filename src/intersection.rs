@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use crate::car::Car;
 use crate::cars_id::CarIdGenerator;
+use crate::crossing_manager::CrossingManager;
 
 use rand::prelude::IndexedRandom;
 use rand::rng;
@@ -26,6 +27,7 @@ pub struct Intersection<'a> {
     pub cars_in: HashMap<(Direction, Route), Vec<Car<'a>>>,
     pub cars_out: Vec<Car<'a>>,
     pub id_generator: CarIdGenerator,
+    pub crossing_manager: CrossingManager,
 }
 
 impl<'a> Intersection<'a> {
@@ -35,13 +37,14 @@ impl<'a> Intersection<'a> {
 
         let mut cars_in = HashMap::new();
         let id_generator = CarIdGenerator::new();
+        let crossing_manager = CrossingManager::new();
 
         for dir in [North, South, East, West] {
             for route in [Left, Straight, Right] {
                 cars_in.insert((dir, route), Vec::new());
             }
         }
-        Intersection { cars_in, cars_out: Vec::new(), id_generator }
+        Intersection { cars_in, cars_out: Vec::new(), id_generator, crossing_manager }
     }
 
     pub fn add_car_in_rnd(&mut self, texture: &'a Texture<'a>) {
