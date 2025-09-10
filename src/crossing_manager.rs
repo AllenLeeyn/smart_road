@@ -28,7 +28,8 @@ impl CrossingManager {
         CrossingManager { grid }
     }
 
-    pub fn latest_available_time(&self, path: &[ZoneIndex]) -> SystemTime {
+    pub fn latest_available_time(&self, dir: Direction, route: Route, distance_to_entry: f64) -> SystemTime {
+        let path = route_to_zone_path(dir, route);
         let now = SystemTime::now();
 
         let zone_length_px = 50.0;
@@ -40,10 +41,11 @@ impl CrossingManager {
         let safe_distance_px = 50.0 + (7.0 * 15.0);
         let safe_time_gap = Duration::from_secs_f64(safe_distance_px / speed_px_per_sec);
 
-        let mut base_time = now;
+        let travel_time = Duration::from_secs_f64(distance_to_entry / speed_px_per_sec);
+        let mut base_time = now + travel_time;
 
         // Loop until we find a time with no conflicts + safety gap
-        'try_time: loop {
+        let base_time = 'try_time: loop {
             for (i, zone) in path.iter().enumerate() {
                 let zone_entry_time = base_time + zone_time * i as u32;
                 let zone_exit_time = zone_entry_time + car_occupy_time + safe_time_gap;
@@ -53,20 +55,21 @@ impl CrossingManager {
                         let overlaps = res.time_in < zone_exit_time && res.time_out > zone_entry_time;
                         if overlaps {
                             // Conflict — delay base_time and restart
-                            base_time = res.time_out - zone_time * i as u32;
+                            base_time = base_time.max(res.time_out - zone_time * i as u32);
                             continue 'try_time;
                         }
                     }
                 }
             }
-
             break base_time;
-        }
+        };
+        base_time
     }
 
-    pub fn reserve_path(&mut self, car_id: &str, path: &[ZoneIndex]) -> SystemTime {
-        let entry_time = self.latest_available_time(path);
-        let reservations = generate_zone_reservations(car_id, path, entry_time);
+    pub fn reserve_path(&mut self, car_id: &str, dir: Direction, route: Route, distance_to_entry: f64) -> SystemTime {
+        let entry_time = self.latest_available_time(dir, route, distance_to_entry);
+        let path = route_to_zone_path(dir, route);
+        let reservations = generate_zone_reservations(car_id, &path, entry_time);
 
         for (zone, reservation) in reservations {
             if let Some(zone_res_list) = self.grid.get_mut(&zone) {
@@ -100,8 +103,8 @@ fn route_to_zone_path(dir: Direction, route: Route) -> Vec<ZoneIndex> {
             (1,3), (1,2), (1,1), (2,1), (3,1)],
         (Direction::West, Route::Straight) => vec![
             (0,3), (0,2), (0,1), (0,0)],
-            _ => vec![(0,0)],
-        
+
+        (_, Route::Right) => vec![],
     }
 }
 

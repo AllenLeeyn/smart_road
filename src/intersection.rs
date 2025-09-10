@@ -7,6 +7,7 @@ use rand::prelude::IndexedRandom;
 use rand::rng;
 use sdl2::render::Texture;
 use std::time::Duration;
+use chrono::{DateTime, Local};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
@@ -48,29 +49,19 @@ impl<'a> Intersection<'a> {
     }
 
     pub fn add_car_in_rnd(&mut self, texture: &'a Texture<'a>) {
-        let mut rng = rng();
-        let directions = [
-            Direction::North, Direction::South,
-            Direction::East, Direction::West];
-        let direction = *directions.choose(&mut rng).unwrap();
+        let direction = get_rnd_direction();
         self.add_car_in(direction, &texture);
     }
 
     pub fn add_car_in(&mut self, direction: Direction, texture: &'a Texture<'a>) {
-        let mut rng = rng();
-        let routes = [Route::Left, Route::Right, Route::Straight];
-        let route = *routes.choose(&mut rng).unwrap();
-        
-        // Adjust position and speed based on direction
+        let route = get_rnd_route();
         let (x, y, speed) = spawn_position(direction, route);
-
-        // Access lane
         let lane = self.cars_in.get(&(direction, route)).unwrap();
 
         // Check safe distance from the last car in lane (if any)
         let can_spawn = match lane.last() {
             Some(last_car) => {
-                let safe_distance = 50 + last_car.speed * 15;
+                let safe_distance = 80 + 50 + last_car.speed * 3;
 
                 match direction {
                     Direction::South => last_car.y - y >= safe_distance,
@@ -87,11 +78,21 @@ impl<'a> Intersection<'a> {
             return;
         }
 
-        let car = Car::new(
-            self.id_generator.get_next(direction, route), x, y, 33, 80, 
-            speed, texture, route, direction);
+        let car_id = self.id_generator.get_next(direction, route);
+        let distance_to_entry = if route == Route::Right { 300.0 } else { 350.0 };
+        let entry_time = self.crossing_manager.latest_available_time(
+                                            direction, route, distance_to_entry);
+        self.crossing_manager.reserve_path(&car_id, direction, route, distance_to_entry);
 
-        println!("✅ Spawned car heading {:?} going {:?}", direction, route);
+        let car = Car::new(
+            car_id.clone(), x, y, 33, 80, 
+            speed, texture, route, entry_time, direction);
+
+       let datetime: DateTime<Local> = entry_time.into();
+        println!(
+            "✅ Spawned car {} heading {:?} going {:?} | Entry time: {}",
+            car_id, direction, route, datetime.format("%H:%M:%S%.3f")
+        );
         self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
     }
 
@@ -198,4 +199,21 @@ pub fn spawn_position(direction: Direction, route: Route) -> (i32, i32, i32) {
 
 fn round_two(n: f32) -> f32 {
     (n * 100.0).round() / 100.0
+}
+
+pub fn get_rnd_route() -> Route {
+    let routes = [Route::Left, Route::Right, Route::Straight];
+    let mut rng = rng();
+    *routes.choose(&mut rng).unwrap()
+}
+
+pub fn get_rnd_direction() -> Direction {
+    let directions = [
+        Direction::North,
+        Direction::South,
+        Direction::East,
+        Direction::West,
+    ];
+    let mut rng = rng();
+    *directions.choose(&mut rng).unwrap()
 }

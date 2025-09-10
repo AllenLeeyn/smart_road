@@ -2,7 +2,7 @@ use sdl2::render::{Canvas, Texture};
 use sdl2::rect::Rect;
 use sdl2::video::Window;
 use crate::intersection::{Route, Direction};
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
 
 pub struct Car<'a> {
     pub id: String,
@@ -19,14 +19,18 @@ pub struct Car<'a> {
 
     pub time_enter: SystemTime,
     pub time_exit: Option<SystemTime>,
+    pub entry_time: SystemTime,
     pub dist: i32,
 }
 
 impl<'a> Car<'a> {
+    const MAX_SPEED: i32 = 7;
+    const ENTRY_DISTANCE_PX: i32 = 350;
+
     pub fn new(
         id: String, x: i32, y: i32, width: u32, height: u32,
         speed: i32, texture: &'a Texture<'a>,
-        route: Route, direction: Direction,
+        route: Route, entry_time: SystemTime, direction: Direction,
     ) -> Self {
         let dist = match route {
             Route::Right => 650,
@@ -38,8 +42,17 @@ impl<'a> Car<'a> {
             id, x, y, width, height,
             speed, texture,
             route, direction, turned: false, exited: false,
-            time_enter: SystemTime::now(), time_exit: None,
+            time_enter: SystemTime::now(), time_exit: None, entry_time,
             dist
+        }
+    }
+
+    pub fn distance_to_entry(&self) -> i32 {
+        match self.direction {
+            Direction::North => 900 - self.y - 60,
+            Direction::South => self.y,
+            Direction::East  => self.x,
+            Direction::West  => 900 - self.x - 40,
         }
     }
 
@@ -74,21 +87,41 @@ impl<'a> Car<'a> {
     }
 
     fn update_straight(&mut self) {
-        match self.direction {
-            Direction::North => self.y -= self.speed,
-            Direction::South => self.y += self.speed,
-            Direction::East  => self.x += self.speed,
-            Direction::West  => self.x -= self.speed,
+        let now = SystemTime::now();
+        let distance_to_entry = (self.distance_to_entry() - Self::ENTRY_DISTANCE_PX).max(0);
+
+        let time_left = self.entry_time
+            .duration_since(now)
+            .unwrap_or(Duration::ZERO)
+            .as_secs_f64();
+
+        let speed_px_per_sec = if time_left > 0.0 {
+            distance_to_entry as f64 / time_left
+        } else {
+            (Self::MAX_SPEED * 60) as f64  // Max speed in px/s
+        };
+
+        // Convert target speed from px/sec to px/frame
+        let target_speed = (speed_px_per_sec / 60.0).round() as i32;
+
+        // Gradually accelerate/decelerate toward target_speed
+        let max_acceleration = 1; // px/frame² (change per frame)
+        if self.speed < target_speed {
+            self.speed = (self.speed + max_acceleration).min(target_speed).min(Self::MAX_SPEED);
+        } else if self.speed > target_speed {
+            self.speed = (self.speed - max_acceleration).max(target_speed).max(1);
         }
-    }
+
+            match self.direction {
+                Direction::North => self.y -= self.speed,
+                Direction::South => self.y += self.speed,
+                Direction::East  => self.x += self.speed,
+                Direction::West  => self.x -= self.speed,
+            }
+        }
 
     fn update_right_turn(&mut self) {
-        let distance_forward = match self.direction {
-            Direction::North => 900 - self.y - 60,
-            Direction::South => self.y,
-            Direction::East  => self.x,
-            Direction::West  => 900 - self.x - 40,
-        };
+        let distance_forward = self.distance_to_entry();
 
         if self.turned || distance_forward < 300 {
             self.update_straight();
@@ -121,12 +154,7 @@ impl<'a> Car<'a> {
 
     
     fn update_left_turn(&mut self) {
-        let distance_forward = match self.direction {
-            Direction::North => 900 - self.y - 60,
-            Direction::South => self.y,
-            Direction::East  => self.x,
-            Direction::West  => 900 - self.x - 40,
-        };
+        let distance_forward = self.distance_to_entry();
 
         if self.turned || distance_forward < 450 {
             self.update_straight();
