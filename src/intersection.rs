@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use crate::car::Car;
 use crate::cars_id::CarIdGenerator;
+use std::collections::HashMap;
 
 use rand::prelude::IndexedRandom;
 use rand::rng;
@@ -41,14 +41,21 @@ impl<'a> Intersection<'a> {
                 cars_in.insert((dir, route), Vec::new());
             }
         }
-        Intersection { cars_in, cars_out: Vec::new(), id_generator }
+        Intersection {
+            cars_in,
+            cars_out: Vec::new(),
+            id_generator,
+        }
     }
 
     pub fn add_car_in_rnd(&mut self, texture: &'a Texture<'a>) {
         let mut rng = rng();
         let directions = [
-            Direction::North, Direction::South,
-            Direction::East, Direction::West];
+            Direction::North,
+            Direction::South,
+            Direction::East,
+            Direction::West,
+        ];
         let direction = *directions.choose(&mut rng).unwrap();
         self.add_car_in(direction, &texture);
     }
@@ -57,7 +64,7 @@ impl<'a> Intersection<'a> {
         let mut rng = rng();
         let routes = [Route::Left, Route::Right, Route::Straight];
         let route = *routes.choose(&mut rng).unwrap();
-        
+
         // Adjust position and speed based on direction
         let (x, y, speed) = spawn_position(direction, route);
 
@@ -72,8 +79,8 @@ impl<'a> Intersection<'a> {
                 match direction {
                     Direction::South => last_car.y - y >= safe_distance,
                     Direction::North => y - last_car.y >= safe_distance,
-                    Direction::East  => last_car.x - x >= safe_distance,
-                    Direction::West  => x - last_car.x >= safe_distance,
+                    Direction::East => last_car.x - x >= safe_distance,
+                    Direction::West => x - last_car.x >= safe_distance,
                 }
             }
             None => true, // Lane is empty, okay to spawn
@@ -85,19 +92,76 @@ impl<'a> Intersection<'a> {
         }
 
         let car = Car::new(
-            self.id_generator.get_next(direction, route), x, y, 33, 80, 
-            speed, texture, route, direction);
+            self.id_generator.get_next(direction, route),
+            x,
+            y,
+            33,
+            80,
+            speed,
+            texture,
+            route,
+            direction,
+        );
 
         println!("✅ Spawned car heading {:?} going {:?}", direction, route);
         self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
     }
 
     pub fn update(&mut self) {
-        for queue in self.cars_in.values_mut() {
-            let mut i = 0;
+        // Collect all cars in intersection for yield checking
+        let mut intersection_cars = Vec::new();
+        for queue in self.cars_in.values() {
+            for car in queue {
+                if car.x >= 250 && car.x <= 650 && car.y >= 250 && car.y <= 650 {
+                    intersection_cars.push((car.id.clone(), car.direction, car.route));
+                }
+            }
+        }
 
+        // update cars
+        for queue in self.cars_in.values_mut() {
+            // Calculate which cars should stop due to rear-end prevention
+            let mut should_stop_for_following = vec![false; queue.len()];
+            for i in 1..queue.len() {
+                let front_car = &queue[i - 1];
+                let following_car = &queue[i];
+
+                // Calculate distance between cars
+                let dx = (front_car.x - following_car.x).abs();
+                let dy = (front_car.y - following_car.y).abs();
+                let distance = ((dx as f64 * dx as f64 + dy as f64 * dy as f64).sqrt()) as i32;
+                let safe_distance = 50 + following_car.speed * 10;
+
+                if distance < safe_distance {
+                    should_stop_for_following[i] = true;
+                }
+            }
+
+            let mut i = 0;
             while i < queue.len() {
                 let car = &mut queue[i];
+
+                // Check if car should yield based on intersection state
+                let should_yield = Self::car_should_yield(car, &intersection_cars);
+
+                let approaching = match car.direction {
+                    Direction::North => car.y > 650 && car.y < 750,
+                    Direction::South => car.y < 250 && car.y > 150,
+                    Direction::East => car.x < 250 && car.x > 150,
+                    Direction::West => car.x > 650 && car.x < 750,
+                };
+
+                // Stop car if too close to car ahead or should yield at intersection
+                if should_stop_for_following[i] || (approaching && should_yield) {
+                    car.speed = 0;
+                } else if car.speed == 0 && !should_yield && !should_stop_for_following[i] {
+                    // Restore speed when it's safe to proceed
+                    car.speed = match car.route {
+                        Route::Right => 7,
+                        _ => 5,
+                    };
+                }
+
                 car.update();
 
                 if car.exited {
@@ -108,6 +172,37 @@ impl<'a> Intersection<'a> {
                 }
             }
         }
+    }
+
+    fn car_should_yield(car: &Car, intersection_cars: &[(String, Direction, Route)]) -> bool {
+        // Check if car is approaching intersection
+        let car_approaching = match car.direction {
+            Direction::North => car.y > 650,
+            Direction::South => car.y < 250,
+            Direction::East => car.x < 250,
+            Direction::West => car.x > 650,
+        };
+
+        if !car_approaching {
+            return false; // Car already in intersection doesn't need to yield
+        }
+
+        // Real traffic rules:
+        // 1. Approaching cars yield to cars already in intersection
+        // 2. Left turns yield to straight and right from opposite direction
+
+        for (other_id, other_direction, other_route) in intersection_cars {
+            // Skip self
+            if *other_id == car.id {
+                continue;
+            }
+
+            // Always yield to cars already in intersection
+            return true;
+
+        }
+
+        false
     }
 
     pub fn draw(&self, canvas: &mut sdl2::render::Canvas<sdl2::video::Window>) {
