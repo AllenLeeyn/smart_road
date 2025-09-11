@@ -29,6 +29,7 @@ pub struct Intersection<'a> {
     pub cars_out: Vec<Car<'a>>,
     pub id_generator: CarIdGenerator,
     pub crossing_manager: CrossingManager,
+    pub collision_count: usize,
 }
 
 impl<'a> Intersection<'a> {
@@ -45,7 +46,9 @@ impl<'a> Intersection<'a> {
                 cars_in.insert((dir, route), Vec::new());
             }
         }
-        Intersection { cars_in, cars_out: Vec::new(), id_generator, crossing_manager }
+        Intersection {
+            cars_in, cars_out: Vec::new(),
+            id_generator, crossing_manager, collision_count: 0 }
     }
 
     pub fn add_car_in_rnd(&mut self, texture: &'a Texture<'a>) {
@@ -57,21 +60,7 @@ impl<'a> Intersection<'a> {
         let route = get_rnd_route();
         let (x, y, speed) = spawn_position(direction, route);
         let lane = self.cars_in.get(&(direction, route)).unwrap();
-
-        // Check safe distance from the last car in lane (if any)
-        let can_spawn = match lane.last() {
-            Some(last_car) => {
-                let safe_distance = 80 + 50 + last_car.speed * 3;
-
-                match direction {
-                    Direction::South => last_car.y - y >= safe_distance,
-                    Direction::North => y - last_car.y >= safe_distance,
-                    Direction::East  => last_car.x - x >= safe_distance,
-                    Direction::West  => x - last_car.x >= safe_distance,
-                }
-            }
-            None => true, // Lane is empty, okay to spawn
-        };
+        let can_spawn = car_spawn_check(lane, direction, x, y, 78);
 
         if !can_spawn {
             println!("🚫 Too close to last car in {:?} {:?}", direction, route);
@@ -85,7 +74,7 @@ impl<'a> Intersection<'a> {
         self.crossing_manager.reserve_path(&car_id, direction, route, distance_to_entry);
 
         let car = Car::new(
-            car_id.clone(), x, y, 33, 80, 
+            car_id.clone(), x, y, 33, 78, 
             speed, texture, route, entry_time, direction);
 
        let datetime: DateTime<Local> = entry_time.into();
@@ -95,13 +84,47 @@ impl<'a> Intersection<'a> {
         );
         self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
     }
+    
+    fn check_cars_collision(&mut self) {
+        let mut cars: Vec<&mut Car> = Vec::new();
+
+        for queue in self.cars_in.values_mut() {
+            for car in queue.iter_mut() {
+                cars.push(car);
+            }
+        }
+
+        let len = cars.len();
+        for i in 0..len {
+            for j in (i + 1)..len {
+                // SAFELY get two mutable references without aliasing using split_at_mut
+                let (left, right) = cars.split_at_mut(j);
+                let a = &mut left[i];
+                let b = &mut right[0];
+
+                if (!a.collided || !b.collided) && a.intersects(b) {
+                    println!("💥 Collision between {} and {}", a.id, b.id);
+                    a.collided = true;
+                    b.collided = true;
+                    self.collision_count += 1;
+                }
+            }
+        }
+    }
 
     pub fn update(&mut self) {
+        self.check_cars_collision();
         for queue in self.cars_in.values_mut() {
             let mut i = 0;
 
             while i < queue.len() {
                 let car = &mut queue[i];
+                
+                if car.collided {
+                    i += 1;
+                    continue;
+                }
+
                 car.update();
 
                 if car.exited {
@@ -164,11 +187,13 @@ impl<'a> Intersection<'a> {
             "Intersection Statistics\n\
              -----------------------------\n\
              Vehicles Crossed: {}\n\
+             Collisions: {}\n\
              Max Speed: {} px/s\n\
              Min Speed: {} px/s\n\
              Max Time in Intersection: {} s\n\
              Min Time in Intersection: {} s",
             total,
+            self.collision_count,
             round_two(max_speed),
             round_two(min_speed),
             round_two(min_duration.as_secs_f32()),
@@ -187,13 +212,33 @@ pub fn spawn_position(direction: Direction, route: Route) -> (i32, i32, i32) {
         (Direction::North, Route::Straight) => (508, 900, 5),
         (Direction::North, Route::Right) => (558, 900, 7),
 
-        (Direction::East, Route::Left) => (-80, 438, 5),
-        (Direction::East, Route::Straight) => (-80, 488, 5),
-        (Direction::East, Route::Right) => (-80, 538, 7),
+        (Direction::East, Route::Left) => (-80, 458, 5),
+        (Direction::East, Route::Straight) => (-80, 508, 5),
+        (Direction::East, Route::Right) => (-80, 558, 7),
 
-        (Direction::West, Route::Left) => (900, 388, 5),
-        (Direction::West, Route::Straight) => (900, 338, 5),
-        (Direction::West, Route::Right) => (900, 288, 7),
+        (Direction::West, Route::Left) => (900, 408, 5),
+        (Direction::West, Route::Straight) => (900, 358, 5),
+        (Direction::West, Route::Right) => (900, 308, 7),
+    }
+}
+
+fn car_spawn_check(lane: &Vec<Car>, direction: Direction, x: i32, y: i32, height: i32) -> bool {
+    match lane.last() {
+        Some(last_car) => {
+            let safe_distance = 50.max(last_car.speed * 12);
+            let last_bb = last_car.bounding_box();
+            match direction {
+                Direction::North =>
+                    y >= last_bb.y() + last_bb.height() as i32 + safe_distance,
+                Direction::South => 
+                    y + height + safe_distance <= last_bb.y(),
+                Direction::East => 
+                    x + height + safe_distance <= last_bb.x(),
+                Direction::West => 
+                    x >= last_bb.x() + last_bb.width() as i32 + safe_distance,
+            }
+        }
+        None => true,
     }
 }
 
