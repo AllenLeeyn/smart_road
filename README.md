@@ -93,5 +93,5 @@ i will share the details of each file.
 For now, just remember the files and context and wait for my prompt (unless there is something critical)
 
 we need to implement:
-- reservation of cars
-- car need to keep track of current speed and distance to crossing and allocated time slot
+resevation logic is faulty
+need better speed calculation

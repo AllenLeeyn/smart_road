@@ -33,7 +33,7 @@ impl CrossingManager {
         let now = SystemTime::now();
 
         let zone_length_px = 50.0;
-        let car_length_px = 80.0;
+        let car_length_px = 78.0;
         let speed_px_per_sec = 420.0; // constant 7px/frame * 60fps
 
         let zone_time = Duration::from_secs_f64(zone_length_px / speed_px_per_sec);
@@ -115,7 +115,7 @@ pub fn generate_zone_reservations(
 ) -> Vec<(ZoneIndex, ZoneReservation)> {
     let speed_px_per_sec = 420.0;
     let zone_length_px = 50.0;
-    let car_length_px = 80.0;
+    let car_length_px = 78.0;
     let safe_distance_px = 50.0 + (7.0 * 15.0);
 
     let zone_time = Duration::from_secs_f64(zone_length_px / speed_px_per_sec);
