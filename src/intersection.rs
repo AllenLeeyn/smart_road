@@ -57,32 +57,35 @@ impl<'a> Intersection<'a> {
     }
 
     pub fn add_car_in(&mut self, direction: Direction, texture: &'a Texture<'a>) {
-        let route = get_rnd_route();
-        let (x, y, speed) = spawn_position(direction, route);
-        let lane = self.cars_in.get(&(direction, route)).unwrap();
-        let can_spawn = car_spawn_check(lane, direction, x, y, 78);
 
-        if !can_spawn {
-            println!("🚫 Too close to last car in {:?} {:?}", direction, route);
-            return;
+        for route in get_rnd_routes() {
+            let (x, y, speed) = spawn_position(direction, route);
+            let lane = self.cars_in.get(&(direction, route)).unwrap();
+            let can_spawn = car_spawn_check(lane, direction, x, y, 78);
+
+            if can_spawn {
+                let car_id = self.id_generator.get_next(direction, route);
+                let distance_to_entry = if route == Route::Right { 300.0 } else { 350.0 };
+                let entry_time = self.crossing_manager.latest_available_time(
+                                                direction, route, distance_to_entry);
+                self.crossing_manager.reserve_path(&car_id, direction, route, distance_to_entry);
+
+                let car = Car::new(
+                    car_id.clone(), x, y, 33, 78, 
+                    speed, texture, route, entry_time, direction);
+
+                let datetime: DateTime<Local> = entry_time.into();
+                println!(
+                    "✅ Spawned car {} heading {:?} going {:?} | Entry time: {}",
+                    car_id, direction, route, datetime.format("%H:%M:%S%.3f")
+                );
+                self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
+                return; // Successfully spawned, exit function
+            }
         }
 
-        let car_id = self.id_generator.get_next(direction, route);
-        let distance_to_entry = if route == Route::Right { 300.0 } else { 350.0 };
-        let entry_time = self.crossing_manager.latest_available_time(
-                                            direction, route, distance_to_entry);
-        self.crossing_manager.reserve_path(&car_id, direction, route, distance_to_entry);
-
-        let car = Car::new(
-            car_id.clone(), x, y, 33, 78, 
-            speed, texture, route, entry_time, direction);
-
-       let datetime: DateTime<Local> = entry_time.into();
-        println!(
-            "✅ Spawned car {} heading {:?} going {:?} | Entry time: {}",
-            car_id, direction, route, datetime.format("%H:%M:%S%.3f")
-        );
-        self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
+        // If reached here, no lane available
+        println!("🚫 No free lane found for spawning car in direction {:?}", direction);
     }
     
     fn check_cars_collision(&mut self) {
@@ -114,6 +117,7 @@ impl<'a> Intersection<'a> {
 
     pub fn update(&mut self) {
         self.check_cars_collision();
+        self.crossing_manager.update();
         for queue in self.cars_in.values_mut() {
             let mut i = 0;
 
@@ -143,6 +147,7 @@ impl<'a> Intersection<'a> {
                 car.draw(canvas);
             }
         }
+        let _ = self.crossing_manager.draw(canvas);
     }
 
     pub fn get_statistics(&self) -> String {
@@ -246,10 +251,12 @@ fn round_two(n: f32) -> f32 {
     (n * 100.0).round() / 100.0
 }
 
-pub fn get_rnd_route() -> Route {
-    let routes = [Route::Left, Route::Right, Route::Straight];
+use rand::prelude::SliceRandom;
+pub fn get_rnd_routes() -> Vec<Route> {
+    let mut routes = vec![Route::Left, Route::Right, Route::Straight];
     let mut rng = rng();
-    *routes.choose(&mut rng).unwrap()
+    routes.shuffle(&mut rng);
+    routes
 }
 
 pub fn get_rnd_direction() -> Direction {

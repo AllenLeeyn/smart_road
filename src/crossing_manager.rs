@@ -1,12 +1,21 @@
 use crate::intersection::{Direction, Route};
 use std::collections::HashMap;
 use std::time::{SystemTime, Duration};
+use sdl2::pixels::Color;
+use sdl2::rect::Rect;
+use sdl2::render::Canvas;
+use sdl2::video::Window;
+
+const ZONE_LENGTH_PX: f64 = 50.0;
+const CAR_LENGTH_PX: f64 = 78.0;
+const SPEED_PX_PER_SEC: f64 = 420.0;
+const SAFE_DISTANCE_PX: f64 = 50.0 + (7.0 * 15.0);
 
 pub type ZoneIndex = (usize, usize); // e.g., (2, 1)
 
 #[derive(Clone)]
 pub struct ZoneReservation {
-    pub car_id: String,                   // Unique ID
+    pub _car_id: String,                   // Unique ID
     pub time_in: SystemTime,
     pub time_out: SystemTime,
 }
@@ -16,7 +25,6 @@ pub struct CrossingManager {
 }
 
 impl CrossingManager {
-
     pub fn new() -> Self {
         let mut grid = HashMap::new();
 
@@ -32,16 +40,11 @@ impl CrossingManager {
         let path = route_to_zone_path(dir, route);
         let now = SystemTime::now();
 
-        let zone_length_px = 50.0;
-        let car_length_px = 78.0;
-        let speed_px_per_sec = 420.0; // constant 7px/frame * 60fps
+        let zone_time = Duration::from_secs_f64(ZONE_LENGTH_PX / SPEED_PX_PER_SEC);
+        let car_occupy_time = Duration::from_secs_f64(CAR_LENGTH_PX / SPEED_PX_PER_SEC);
+        let safe_time_gap = Duration::from_secs_f64(SAFE_DISTANCE_PX / SPEED_PX_PER_SEC);
+        let travel_time = Duration::from_secs_f64(distance_to_entry / SPEED_PX_PER_SEC);
 
-        let zone_time = Duration::from_secs_f64(zone_length_px / speed_px_per_sec);
-        let car_occupy_time = Duration::from_secs_f64(car_length_px / speed_px_per_sec);
-        let safe_distance_px = 50.0 + (7.0 * 15.0);
-        let safe_time_gap = Duration::from_secs_f64(safe_distance_px / speed_px_per_sec);
-
-        let travel_time = Duration::from_secs_f64(distance_to_entry / speed_px_per_sec);
         let mut base_time = now + travel_time;
 
         // Loop until we find a time with no conflicts + safety gap
@@ -79,7 +82,64 @@ impl CrossingManager {
 
         entry_time
     }
+    
+    pub fn update(&mut self) {
+        let now = SystemTime::now();
 
+        for res_list in self.grid.values_mut() {
+            res_list.retain(|res| res.time_out > now);
+        }
+    }
+
+    pub fn draw(&self, canvas: &mut Canvas<Window>) -> Result<(), String> {
+        let rect = Rect::new(300, 300, 300, 300);
+        canvas.set_draw_color(Color::RGB(128, 128, 128));
+        canvas.draw_rect(rect)?;
+
+        let zone_size = ZONE_LENGTH_PX as i32;
+        let start_x = 350;
+        let start_y = 350;
+        let now = SystemTime::now();
+
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+
+        for y in 0..4 {
+            for x in 0..4 {
+                let rect = Rect::new(
+                    start_x + x as i32 * zone_size,
+                    start_y + y as i32 * zone_size,
+                    zone_size as u32,
+                    zone_size as u32,
+                );
+
+                let reservations = self.grid.get(&(y, x)).unwrap();
+                let mut has_active = false;
+                let mut has_any = false;
+
+                for res in reservations {
+                    has_any = true;
+                    if res.time_in <= now && res.time_out > now {
+                        has_active = true;
+                        break;
+                    }
+                }
+
+                let color = if has_active {
+                    Color::RGB(160, 32, 240) // Purple (active)
+                } else if has_any {
+                    Color::RGB(255, 0, 0)    // Red (reserved, but inactive)
+                } else {
+                    Color::RGB(0, 255, 0)    // Green (free)
+                };
+
+                canvas.set_draw_color(color);
+                canvas.draw_rect(rect)?;
+            }
+        }
+
+        canvas.present();
+        Ok(())
+    }
 }
 
 fn route_to_zone_path(dir: Direction, route: Route) -> Vec<ZoneIndex> {
@@ -113,14 +173,9 @@ pub fn generate_zone_reservations(
     path: &[ZoneIndex],
     entry_time: SystemTime,
 ) -> Vec<(ZoneIndex, ZoneReservation)> {
-    let speed_px_per_sec = 420.0;
-    let zone_length_px = 50.0;
-    let car_length_px = 78.0;
-    let safe_distance_px = 50.0 + (7.0 * 15.0);
-
-    let zone_time = Duration::from_secs_f64(zone_length_px / speed_px_per_sec);
-    let occupy_time = Duration::from_secs_f64(car_length_px / speed_px_per_sec);
-    let safe_gap = Duration::from_secs_f64(safe_distance_px / speed_px_per_sec);
+    let zone_time = Duration::from_secs_f64(ZONE_LENGTH_PX / SPEED_PX_PER_SEC);
+    let occupy_time = Duration::from_secs_f64(CAR_LENGTH_PX / SPEED_PX_PER_SEC);
+    let safe_gap = Duration::from_secs_f64(SAFE_DISTANCE_PX / SPEED_PX_PER_SEC);
 
     let mut reservations = Vec::new();
 
@@ -129,7 +184,7 @@ pub fn generate_zone_reservations(
         let time_out = time_in + occupy_time + safe_gap;
 
         let reservation = ZoneReservation {
-            car_id: car_id.to_string(),
+            _car_id: car_id.to_string(),
             time_in,
             time_out,
         };

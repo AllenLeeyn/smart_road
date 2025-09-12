@@ -1,6 +1,6 @@
 use sdl2::render::{Canvas, Texture};
 use sdl2::pixels::Color;
-use sdl2::rect::{Rect, Point};
+use sdl2::rect::{Rect};
 use sdl2::video::Window;
 use crate::intersection::{Route, Direction};
 use std::time::{SystemTime, Duration};
@@ -28,7 +28,7 @@ pub struct Car<'a> {
 }
 
 impl<'a> Car<'a> {
-    const MAX_SPEED: i32 = 2;
+    const MAX_SPEED: i32 = 7;
     const ENTRY_DISTANCE_PX: i32 = 350;
 
     pub fn new(
@@ -66,10 +66,10 @@ impl<'a> Car<'a> {
 
     pub fn distance_to_entry(&self) -> i32 {
         match self.direction {
-            Direction::North => 900 - self.y - 60,
-            Direction::South => self.y,
-            Direction::East  => self.x,
-            Direction::West  => 900 - self.x - 40,
+            Direction::North => 900 - self.y,
+            Direction::South => self.y + self.height as i32,
+            Direction::East  => self.x + self.height as i32,
+            Direction::West  => 900 - self.x,
         }
     }
 
@@ -162,7 +162,7 @@ impl<'a> Car<'a> {
     fn update_right_turn(&mut self) {
         let distance_forward = self.distance_to_entry();
 
-        if self.turned || distance_forward < 300 {
+        if self.turned || distance_forward < 350 {
             self.update_straight();
         } else {
             match self.direction {
@@ -195,7 +195,7 @@ impl<'a> Car<'a> {
     fn update_left_turn(&mut self) {
         let distance_forward = self.distance_to_entry();
 
-        if self.turned || distance_forward < 450 {
+        if self.turned || distance_forward < 500 {
             self.update_straight();
         } else {
             match self.direction {
