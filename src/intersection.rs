@@ -108,15 +108,23 @@ impl<'a> Intersection<'a> {
     }
 
     pub fn update(&mut self) {
-        // Collect all cars in intersection for yield checking
+        // Collect all cars in intersection and approaching for collision checking
         let mut intersection_cars = Vec::new();
+        let mut all_cars_positions = Vec::new();
+
         for queue in self.cars_in.values() {
             for car in queue {
+                // Cars in intersection
                 if car.x >= 250 && car.x <= 650 && car.y >= 250 && car.y <= 650 {
                     intersection_cars.push((car.id.clone(), car.direction, car.route));
                 }
+                // All cars for distance checking
+                all_cars_positions.push((car.id.clone(), car.x, car.y, car.direction, car.route));
             }
         }
+
+        // Simple one-at-a-time intersection policy to prevent deadlocks
+        let intersection_occupied = !intersection_cars.is_empty();
 
         // update cars
         for queue in self.cars_in.values_mut() {
@@ -151,11 +159,20 @@ impl<'a> Intersection<'a> {
                     Direction::West => car.x > 650 && car.x < 750,
                 };
 
-                // Stop car if too close to car ahead or should yield at intersection
-                if should_stop_for_following[i] || (approaching && should_yield) {
+                let in_intersection = car.x >= 250 && car.x <= 650 && car.y >= 250 && car.y <= 650;
+
+                // Deadlock-free policy: Only one car allowed in intersection at a time
+                if approaching && intersection_occupied && !in_intersection {
+                    // Wait if intersection is occupied and car is approaching
                     car.speed = 0;
-                } else if car.speed == 0 && !should_yield && !should_stop_for_following[i] {
-                    // Restore speed when it's safe to proceed
+                } else if should_stop_for_following[i] {
+                    // Stop if too close to car ahead in same lane
+                    car.speed = 0;
+                } else if car.speed == 0
+                    && (!intersection_occupied || in_intersection)
+                    && !should_stop_for_following[i]
+                {
+                    // Restore speed when intersection is free OR car is already inside
                     car.speed = match car.route {
                         Route::Right => 7,
                         _ => 5,
@@ -199,7 +216,6 @@ impl<'a> Intersection<'a> {
 
             // Always yield to cars already in intersection
             return true;
-
         }
 
         false
