@@ -25,6 +25,7 @@ pub enum Route {
 }
 
 pub struct Intersection<'a> {
+    pub car_textures: HashMap<Route, &'a Texture<'a>>,
     pub cars_in: HashMap<(Direction, Route), Vec<Car<'a>>>,
     pub cars_out: Vec<Car<'a>>,
     pub id_generator: CarIdGenerator,
@@ -33,7 +34,7 @@ pub struct Intersection<'a> {
 }
 
 impl<'a> Intersection<'a> {
-    pub fn new() -> Self {
+    pub fn new(car_textures: HashMap<Route, &'a Texture<'a>>) -> Self {
         use Direction::*;
         use Route::*;
 
@@ -47,16 +48,17 @@ impl<'a> Intersection<'a> {
             }
         }
         Intersection {
+            car_textures,
             cars_in, cars_out: Vec::new(),
             id_generator, crossing_manager, collision_count: 0 }
     }
 
-    pub fn add_car_in_rnd(&mut self, texture: &'a Texture<'a>) {
+    pub fn add_car_in_rnd(&mut self) {
         let direction = get_rnd_direction();
-        self.add_car_in(direction, &texture);
+        self.add_car_in(direction);
     }
 
-    pub fn add_car_in(&mut self, direction: Direction, texture: &'a Texture<'a>) {
+    pub fn add_car_in(&mut self, direction: Direction) {
 
         for route in get_rnd_routes() {
             let (x, y, speed) = spawn_position(direction, route);
@@ -70,16 +72,19 @@ impl<'a> Intersection<'a> {
                                                 direction, route, distance_to_entry);
                 self.crossing_manager.reserve_path(&car_id, direction, route, distance_to_entry);
 
+                let texture = self.car_textures.get(&route).expect("Missing texture for route");
+                
                 let car = Car::new(
                     car_id.clone(), x, y, 33, 78, 
                     speed, texture, route, entry_time, direction);
+
+                self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
 
                 let datetime: DateTime<Local> = entry_time.into();
                 println!(
                     "✅ Spawned car {} heading {:?} going {:?} | Entry time: {}",
                     car_id, direction, route, datetime.format("%H:%M:%S%.3f")
                 );
-                self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
                 return; // Successfully spawned, exit function
             }
         }

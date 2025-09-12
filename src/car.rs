@@ -28,13 +28,13 @@ pub struct Car<'b> {
     pub actual_entry_time: Option<SystemTime>,
 }
 
-impl<'a> Car<'a> {
+impl<'b> Car<'b> {
     const MAX_SPEED: i32 = 5;
     const ENTRY_DISTANCE_PX: i32 = 350;
 
     pub fn new(
         id: String, x: i32, y: i32, width: u32, height: u32,
-        speed: i32, texture: &'a Texture<'a>,
+        speed: i32, texture: &'b Texture<'b>,
         route: Route, entry_time: SystemTime, direction: Direction,
     ) -> Self {
         let dist = match route {
