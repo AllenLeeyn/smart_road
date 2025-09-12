@@ -6,6 +6,8 @@ use rand::prelude::IndexedRandom;
 use rand::rng;
 use sdl2::render::Texture;
 use std::time::Duration;
+use chrono::{DateTime, Local};
+use std::time::SystemTime;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
@@ -26,6 +28,7 @@ pub struct Intersection<'a> {
     pub cars_in: HashMap<(Direction, Route), Vec<Car<'a>>>,
     pub cars_out: Vec<Car<'a>>,
     pub id_generator: CarIdGenerator,
+    pub collision_count: usize,
 }
 
 impl<'a> Intersection<'a> {
@@ -42,72 +45,73 @@ impl<'a> Intersection<'a> {
             }
         }
         Intersection {
-            cars_in,
-            cars_out: Vec::new(),
-            id_generator,
-        }
+            cars_in, cars_out: Vec::new(),
+            id_generator, collision_count: 0 }
     }
 
     pub fn add_car_in_rnd(&mut self, texture: &'a Texture<'a>) {
-        let mut rng = rng();
-        let directions = [
-            Direction::North,
-            Direction::South,
-            Direction::East,
-            Direction::West,
-        ];
-        let direction = *directions.choose(&mut rng).unwrap();
+        let direction = get_rnd_direction();
         self.add_car_in(direction, &texture);
     }
 
     pub fn add_car_in(&mut self, direction: Direction, texture: &'a Texture<'a>) {
-        let mut rng = rng();
-        let routes = [Route::Left, Route::Right, Route::Straight];
-        let route = *routes.choose(&mut rng).unwrap();
 
-        // Adjust position and speed based on direction
-        let (x, y, speed) = spawn_position(direction, route);
+        for route in get_rnd_routes() {
+            let (x, y, speed) = spawn_position(direction, route);
+            let lane = self.cars_in.get(&(direction, route)).unwrap();
+            let can_spawn = car_spawn_check(lane, direction, x, y, 78);
 
-        // Access lane
-        let lane = self.cars_in.get(&(direction, route)).unwrap();
+            if can_spawn {
+                let car_id = self.id_generator.get_next(direction, route);
+                let distance_to_entry = if route == Route::Right { 300.0 } else { 350.0 };
+                let entry_time = SystemTime::now();
+                let car = Car::new(
+                    car_id.clone(), x, y, 33, 78, 
+                    speed, texture, route, entry_time, direction);
 
-        // Check safe distance from the last car in lane (if any)
-        let can_spawn = match lane.last() {
-            Some(last_car) => {
-                let safe_distance = 50 + last_car.speed * 15;
-
-                match direction {
-                    Direction::South => last_car.y - y >= safe_distance,
-                    Direction::North => y - last_car.y >= safe_distance,
-                    Direction::East => last_car.x - x >= safe_distance,
-                    Direction::West => x - last_car.x >= safe_distance,
-                }
+                let datetime: DateTime<Local> = entry_time.into();
+                println!(
+                    "✅ Spawned car {} heading {:?} going {:?} | Entry time: {}",
+                    car_id, direction, route, datetime.format("%H:%M:%S%.3f")
+                );
+                self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
+                return; // Successfully spawned, exit function
             }
-            None => true, // Lane is empty, okay to spawn
-        };
-
-        if !can_spawn {
-            println!("🚫 Too close to last car in {:?} {:?}", direction, route);
-            return;
         }
 
-        let car = Car::new(
-            self.id_generator.get_next(direction, route),
-            x,
-            y,
-            33,
-            80,
-            speed,
-            texture,
-            route,
-            direction,
-        );
+        // If reached here, no lane available
+        println!("🚫 No free lane found for spawning car in direction {:?}", direction);
+    }
+    
+    fn check_cars_collision(&mut self) {
+        let mut cars: Vec<&mut Car> = Vec::new();
 
-        println!("✅ Spawned car heading {:?} going {:?}", direction, route);
-        self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
+        for queue in self.cars_in.values_mut() {
+            for car in queue.iter_mut() {
+                cars.push(car);
+            }
+        }
+
+        let len = cars.len();
+        for i in 0..len {
+            for j in (i + 1)..len {
+                // SAFELY get two mutable references without aliasing using split_at_mut
+                let (left, right) = cars.split_at_mut(j);
+                let a = &mut left[i];
+                let b = &mut right[0];
+
+                if (!a.collided || !b.collided) && a.intersects(b) {
+                    println!("💥 Collision between {} and {}", a.id, b.id);
+                    a.collided = true;
+                    b.collided = true;
+                    self.collision_count += 1;
+                }
+            }
+        }
     }
 
     pub fn update(&mut self) {
+        self.check_cars_collision();
         // Collect all cars in intersection for yield checking
         let mut intersection_cars = Vec::new();
         for queue in self.cars_in.values() {
@@ -160,6 +164,12 @@ impl<'a> Intersection<'a> {
                         Route::Right => 7,
                         _ => 5,
                     };
+                }
+
+                
+                if car.collided {
+                    i += 1;
+                    continue;
                 }
 
                 car.update();
@@ -255,11 +265,13 @@ impl<'a> Intersection<'a> {
             "Intersection Statistics\n\
              -----------------------------\n\
              Vehicles Crossed: {}\n\
+             Collisions: {}\n\
              Max Speed: {} px/s\n\
              Min Speed: {} px/s\n\
              Max Time in Intersection: {} s\n\
              Min Time in Intersection: {} s",
             total,
+            self.collision_count,
             round_two(max_speed),
             round_two(min_speed),
             round_two(min_duration.as_secs_f32()),
@@ -278,16 +290,55 @@ pub fn spawn_position(direction: Direction, route: Route) -> (i32, i32, i32) {
         (Direction::North, Route::Straight) => (508, 900, 5),
         (Direction::North, Route::Right) => (558, 900, 7),
 
-        (Direction::East, Route::Left) => (-80, 438, 5),
-        (Direction::East, Route::Straight) => (-80, 488, 5),
-        (Direction::East, Route::Right) => (-80, 538, 7),
+        (Direction::East, Route::Left) => (-80, 458, 5),
+        (Direction::East, Route::Straight) => (-80, 508, 5),
+        (Direction::East, Route::Right) => (-80, 558, 7),
 
-        (Direction::West, Route::Left) => (900, 388, 5),
-        (Direction::West, Route::Straight) => (900, 338, 5),
-        (Direction::West, Route::Right) => (900, 288, 7),
+        (Direction::West, Route::Left) => (900, 408, 5),
+        (Direction::West, Route::Straight) => (900, 358, 5),
+        (Direction::West, Route::Right) => (900, 308, 7),
+    }
+}
+
+fn car_spawn_check(lane: &Vec<Car>, direction: Direction, x: i32, y: i32, height: i32) -> bool {
+    match lane.last() {
+        Some(last_car) => {
+            let safe_distance = 50.max(last_car.speed * 12);
+            let last_bb = last_car.bounding_box();
+            match direction {
+                Direction::North =>
+                    y >= last_bb.y() + last_bb.height() as i32 + safe_distance,
+                Direction::South => 
+                    y + height + safe_distance <= last_bb.y(),
+                Direction::East => 
+                    x + height + safe_distance <= last_bb.x(),
+                Direction::West => 
+                    x >= last_bb.x() + last_bb.width() as i32 + safe_distance,
+            }
+        }
+        None => true,
     }
 }
 
 fn round_two(n: f32) -> f32 {
     (n * 100.0).round() / 100.0
+}
+
+use rand::prelude::SliceRandom;
+pub fn get_rnd_routes() -> Vec<Route> {
+    let mut routes = vec![Route::Left, Route::Right, Route::Straight];
+    let mut rng = rng();
+    routes.shuffle(&mut rng);
+    routes
+}
+
+pub fn get_rnd_direction() -> Direction {
+    let directions = [
+        Direction::North,
+        Direction::South,
+        Direction::East,
+        Direction::West,
+    ];
+    let mut rng = rng();
+    *directions.choose(&mut rng).unwrap()
 }
