@@ -8,8 +8,8 @@ use sdl2::video::Window;
 
 const ZONE_LENGTH_PX: f64 = 50.0;
 const CAR_LENGTH_PX: f64 = 78.0;
-const SPEED_PX_PER_SEC: f64 = 420.0;
-const SAFE_DISTANCE_PX: f64 = 50.0 + (7.0 * 15.0);
+const SPEED_PX_PER_SEC: f64 = 300.0;
+const SAFE_DISTANCE_PX: f64 = 50.0 + (5.0 * 15.0);
 
 pub type ZoneIndex = (usize, usize); // e.g., (2, 1)
 
@@ -137,7 +137,6 @@ impl CrossingManager {
             }
         }
 
-        canvas.present();
         Ok(())
     }
 }

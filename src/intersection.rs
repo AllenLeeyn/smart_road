@@ -230,7 +230,7 @@ pub fn spawn_position(direction: Direction, route: Route) -> (i32, i32, i32) {
 fn car_spawn_check(lane: &Vec<Car>, direction: Direction, x: i32, y: i32, height: i32) -> bool {
     match lane.last() {
         Some(last_car) => {
-            let safe_distance = 50.max(last_car.speed * 12);
+            let safe_distance = 50.max(last_car.speed * 15);
             let last_bb = last_car.bounding_box();
             match direction {
                 Direction::North =>

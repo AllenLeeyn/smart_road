@@ -95,3 +95,4 @@ For now, just remember the files and context and wait for my prompt (unless ther
 we need to implement:
 resevation logic is faulty
 need better speed calculation
+rear end check

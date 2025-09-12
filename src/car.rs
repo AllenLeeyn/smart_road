@@ -6,14 +6,14 @@ use crate::intersection::{Route, Direction};
 use std::time::{SystemTime, Duration};
 use chrono::{DateTime, Local};
 
-pub struct Car<'a> {
+pub struct Car<'b> {
     pub id: String,
     pub x: i32,
     pub y: i32,
     pub width: u32,
     pub height: u32,
     pub speed: i32,
-    pub texture: &'a Texture<'a>,
+    pub texture: &'b Texture<'b>,
     pub route: Route,
     pub direction: Direction,
     pub turned: bool,
@@ -23,12 +23,13 @@ pub struct Car<'a> {
     pub time_enter: SystemTime,
     pub time_exit: Option<SystemTime>,
     pub entry_time: SystemTime,
+    pub in_intersection: bool,
     pub dist: i32,
     pub actual_entry_time: Option<SystemTime>,
 }
 
 impl<'a> Car<'a> {
-    const MAX_SPEED: i32 = 7;
+    const MAX_SPEED: i32 = 5;
     const ENTRY_DISTANCE_PX: i32 = 350;
 
     pub fn new(
@@ -46,7 +47,7 @@ impl<'a> Car<'a> {
             id, x, y, width, height,
             speed, texture,
             route, direction, turned: false, exited: false, collided: false,
-            time_enter: SystemTime::now(), time_exit: None, entry_time,
+            time_enter: SystemTime::now(), time_exit: None, entry_time, in_intersection: false,
             dist, actual_entry_time: None,
         }
     }
@@ -60,9 +61,9 @@ impl<'a> Car<'a> {
         Rect::new(self.x, self.y, w, h)
     }
 
-    pub fn intersects(&self, other: &Car) -> bool {
-        self.bounding_box().has_intersection(other.bounding_box())
-    }
+        pub fn intersects(&self, other: &Car) -> bool {
+            self.bounding_box().has_intersection(other.bounding_box())
+        }
 
     pub fn distance_to_entry(&self) -> i32 {
         match self.direction {
@@ -73,6 +74,14 @@ impl<'a> Car<'a> {
         }
     }
 
+    fn is_at_entry_boundary(&self) -> bool {
+        match self.direction {
+            Direction::North => self.y <= 550,
+            Direction::South => self.y + self.height as i32 >= 350,
+            Direction::East  => self.x + self.height as i32 >= 350,
+            Direction::West  => self.x <= 550,
+        }
+    }
     pub fn update(&mut self) {
         if self.exited {
             return;
@@ -105,30 +114,34 @@ impl<'a> Car<'a> {
 
     fn update_straight(&mut self) {
         let now = SystemTime::now();
-        
-        if self.actual_entry_time.is_none() && self.distance_to_entry() <= Self::ENTRY_DISTANCE_PX {
+
+        if !self.in_intersection && now < self.entry_time {
+            if self.is_at_entry_boundary() {
+                // Stop here until allowed
+                return;
+            }
+        }
+
+        if !self.in_intersection && self.is_at_entry_boundary() {
+            self.in_intersection = true;
             self.actual_entry_time = Some(now);
 
-            // Convert times to chrono::DateTime<Utc> for display
             let actual_dt: DateTime<Local> = now.into();
             let scheduled_dt: DateTime<Local> = self.entry_time.into();
-
-            let diff = self.entry_time
-                .duration_since(now)
+            let diff = self.entry_time.duration_since(now)
                 .map(|d| -(d.as_secs_f64()))
-                .unwrap_or_else(|e| e.duration().as_secs_f64()); // negative = late, positive = early
+                .unwrap_or_else(|e| e.duration().as_secs_f64());
 
             println!(
-                "Car {} reached entry at: {}, scheduled at: {}, diff: {:.3}s",
+                "🚗 Car {} ENTERED at {}, scheduled: {}, diff: {:.3}s",
                 self.id,
-                actual_dt.format("%Y-%m-%d %H:%M:%S%.3f"),
-                scheduled_dt.format("%Y-%m-%d %H:%M:%S%.3f"),
+                actual_dt.format("%H:%M:%S%.3f"),
+                scheduled_dt.format("%H:%M:%S%.3f"),
                 diff,
             );
         }
 
-        let distance_to_entry = (self.distance_to_entry() - Self::ENTRY_DISTANCE_PX).max(0);
-
+        let distance_to_entry = (Self::ENTRY_DISTANCE_PX - self.distance_to_entry()).max(0);
         let time_left = self.entry_time
             .duration_since(now)
             .unwrap_or(Duration::ZERO)
@@ -137,19 +150,19 @@ impl<'a> Car<'a> {
         let speed_px_per_sec = if time_left > 0.0 {
             distance_to_entry as f64 / time_left
         } else {
-            (Self::MAX_SPEED * 60) as f64  // Max speed in px/s
+            (Self::MAX_SPEED * 60) as f64
         };
 
-        // Convert target speed from px/sec to px/frame
         let target_speed = (speed_px_per_sec / 60.0).round() as i32;
+        let max_acceleration = 1;
 
-        // Gradually accelerate/decelerate toward target_speed
-        let max_acceleration = 1; // px/frame² (change per frame)
         if self.speed < target_speed {
             self.speed = (self.speed + max_acceleration).min(target_speed).min(Self::MAX_SPEED);
         } else if self.speed > target_speed {
-            self.speed = (self.speed - max_acceleration).max(target_speed).max(1);
+            self.speed = (self.speed - max_acceleration).max(target_speed).max(0);
         }
+
+        if self.route == Route::Right { self.speed = 7 }
 
         match self.direction {
             Direction::North => self.y -= self.speed,
@@ -244,9 +257,12 @@ impl<'a> Car<'a> {
             .copy_ex(&self.texture, None, dest, angle, None, false, false)
             .unwrap();
             
-        canvas.set_draw_color(Color::RED); // Set bounding box color
-        let bbox = self.bounding_box();
-        canvas.draw_rect(bbox).unwrap(); // Draw the bounding box
+        if !self.in_intersection {
+            canvas.set_draw_color(Color::RGB(255, 255, 0)); // Yellow for waiting
+        } else {
+            canvas.set_draw_color(Color::RGB(0, 0, 255)); // Green for active
+        }
+        canvas.draw_rect(self.bounding_box()).unwrap();
 
         canvas.set_draw_color(Color::BLUE);
         let origin_size = 4; // small square
