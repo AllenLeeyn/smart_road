@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use crate::car::Car;
 use crate::cars_id::CarIdGenerator;
-use crate::crossing_manager::CrossingManager;
 
 use rand::prelude::IndexedRandom;
 use rand::rng;
 use sdl2::render::Texture;
 use std::time::Duration;
 use chrono::{DateTime, Local};
+use std::time::SystemTime;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
@@ -28,7 +28,6 @@ pub struct Intersection<'a> {
     pub cars_in: HashMap<(Direction, Route), Vec<Car<'a>>>,
     pub cars_out: Vec<Car<'a>>,
     pub id_generator: CarIdGenerator,
-    pub crossing_manager: CrossingManager,
     pub collision_count: usize,
 }
 
@@ -39,7 +38,6 @@ impl<'a> Intersection<'a> {
 
         let mut cars_in = HashMap::new();
         let id_generator = CarIdGenerator::new();
-        let crossing_manager = CrossingManager::new();
 
         for dir in [North, South, East, West] {
             for route in [Left, Straight, Right] {
@@ -48,7 +46,7 @@ impl<'a> Intersection<'a> {
         }
         Intersection {
             cars_in, cars_out: Vec::new(),
-            id_generator, crossing_manager, collision_count: 0 }
+            id_generator, collision_count: 0 }
     }
 
     pub fn add_car_in_rnd(&mut self, texture: &'a Texture<'a>) {
@@ -66,10 +64,7 @@ impl<'a> Intersection<'a> {
             if can_spawn {
                 let car_id = self.id_generator.get_next(direction, route);
                 let distance_to_entry = if route == Route::Right { 300.0 } else { 350.0 };
-                let entry_time = self.crossing_manager.latest_available_time(
-                                                direction, route, distance_to_entry);
-                self.crossing_manager.reserve_path(&car_id, direction, route, distance_to_entry);
-
+                let entry_time = SystemTime::now();
                 let car = Car::new(
                     car_id.clone(), x, y, 33, 78, 
                     speed, texture, route, entry_time, direction);
@@ -117,7 +112,6 @@ impl<'a> Intersection<'a> {
 
     pub fn update(&mut self) {
         self.check_cars_collision();
-        self.crossing_manager.update();
         for queue in self.cars_in.values_mut() {
             let mut i = 0;
 
@@ -147,7 +141,6 @@ impl<'a> Intersection<'a> {
                 car.draw(canvas);
             }
         }
-        let _ = self.crossing_manager.draw(canvas);
     }
 
     pub fn get_statistics(&self) -> String {

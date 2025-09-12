@@ -104,53 +104,6 @@ impl<'a> Car<'a> {
     }
 
     fn update_straight(&mut self) {
-        let now = SystemTime::now();
-        
-        if self.actual_entry_time.is_none() && self.distance_to_entry() <= Self::ENTRY_DISTANCE_PX {
-            self.actual_entry_time = Some(now);
-
-            // Convert times to chrono::DateTime<Utc> for display
-            let actual_dt: DateTime<Local> = now.into();
-            let scheduled_dt: DateTime<Local> = self.entry_time.into();
-
-            let diff = self.entry_time
-                .duration_since(now)
-                .map(|d| -(d.as_secs_f64()))
-                .unwrap_or_else(|e| e.duration().as_secs_f64()); // negative = late, positive = early
-
-            println!(
-                "Car {} reached entry at: {}, scheduled at: {}, diff: {:.3}s",
-                self.id,
-                actual_dt.format("%Y-%m-%d %H:%M:%S%.3f"),
-                scheduled_dt.format("%Y-%m-%d %H:%M:%S%.3f"),
-                diff,
-            );
-        }
-
-        let distance_to_entry = (self.distance_to_entry() - Self::ENTRY_DISTANCE_PX).max(0);
-
-        let time_left = self.entry_time
-            .duration_since(now)
-            .unwrap_or(Duration::ZERO)
-            .as_secs_f64();
-
-        let speed_px_per_sec = if time_left > 0.0 {
-            distance_to_entry as f64 / time_left
-        } else {
-            (Self::MAX_SPEED * 60) as f64  // Max speed in px/s
-        };
-
-        // Convert target speed from px/sec to px/frame
-        let target_speed = (speed_px_per_sec / 60.0).round() as i32;
-
-        // Gradually accelerate/decelerate toward target_speed
-        let max_acceleration = 1; // px/frame² (change per frame)
-        if self.speed < target_speed {
-            self.speed = (self.speed + max_acceleration).min(target_speed).min(Self::MAX_SPEED);
-        } else if self.speed > target_speed {
-            self.speed = (self.speed - max_acceleration).max(target_speed).max(1);
-        }
-
         match self.direction {
             Direction::North => self.y -= self.speed,
             Direction::South => self.y += self.speed,
