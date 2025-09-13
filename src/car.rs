@@ -88,31 +88,51 @@ impl<'a> Car<'a> {
     }
 
     pub fn is_too_close(&self, other: &Car) -> bool {
-        let safe_distance = 10;
+    // make safe_distance >= per-tick movement to avoid skipping past the gap
+    let safe_distance = (self.speed).max(10);
 
-        match self.direction {
-            Direction::North => {
-                let this_front = self.y;
-                let other_rear = other.y + other.height as i32;
-                this_front <= other_rear + safe_distance
-            }
-            Direction::South => {
-                let this_front = self.y + self.height as i32;
-                let other_rear = other.y;
-                this_front >= other_rear - safe_distance
-            }
-            Direction::East => {
-                let this_front = self.x;
-                let other_rear = other.x + other.width as i32;
-                this_front >= other_rear + safe_distance
-            }
-            Direction::West => {
-                let this_front = self.x + self.width as i32;
-                let other_rear = other.x;
-                this_front <= other_rear - safe_distance
-            }
+    // sizes as used by bounding_box()
+    let self_horz = match self.direction {
+        Direction::East | Direction::West => self.height as i32,
+        _ => self.width as i32,
+    };
+    let self_vert = match self.direction {
+        Direction::East | Direction::West => self.width as i32,
+        _ => self.height as i32,
+    };
+
+    let other_horz = match other.direction {
+        Direction::East | Direction::West => other.height as i32,
+        _ => other.width as i32,
+    };
+    let other_vert = match other.direction {
+        Direction::East | Direction::West => other.width as i32,
+        _ => other.height as i32,
+    };
+
+    match self.direction {
+        Direction::North => {
+            let this_front = self.y; // top edge
+            let other_rear = other.y + other_vert; // other bottom edge
+            this_front <= other_rear + safe_distance
+        }
+        Direction::South => {
+            let this_front = self.y + self_vert; // bottom edge
+            let other_rear = other.y; // other top edge
+            this_front >= other_rear - safe_distance
+        }
+        Direction::East => {
+            let this_front = self.x + self_horz; // right edge (horz size based on direction)
+            let other_rear = other.x; // other left edge
+            this_front >= other_rear - safe_distance
+        }
+        Direction::West => {
+            let this_front = self.x; // left edge
+            let other_rear = other.x + other_horz; // other right edge
+            this_front <= other_rear + safe_distance
         }
     }
+}
 
     pub fn distance_to_entry(&self) -> i32 {
         match self.direction {
