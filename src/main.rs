@@ -39,7 +39,13 @@ pub fn main() {
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut intersection = Intersection::new(car_textures_by_route);
+
+    use std::time::Instant;
+
+    let target_frame_duration = Duration::from_millis(1000 / 60); // ~16.67ms
+
     'running: loop {
+        let frame_start = Instant::now();
         let events: Vec<_> = event_pump.poll_iter().collect();
 
         for event in events {
@@ -80,7 +86,10 @@ pub fn main() {
         intersection.draw(&mut canvas);
         canvas.present();
 
-        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+        let elapsed = frame_start.elapsed();
+        if elapsed < target_frame_duration {
+            std::thread::sleep(target_frame_duration - elapsed);
+        }
     }
 }
 
