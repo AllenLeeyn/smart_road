@@ -88,51 +88,43 @@ impl<'a> Car<'a> {
     }
 
     pub fn is_too_close(&self, other: &Car) -> bool {
-    // make safe_distance >= per-tick movement to avoid skipping past the gap
     let safe_distance = (self.speed).max(10);
 
-    // sizes as used by bounding_box()
-    let self_horz = match self.direction {
-        Direction::East | Direction::West => self.height as i32,
-        _ => self.width as i32,
-    };
-    let self_vert = match self.direction {
-        Direction::East | Direction::West => self.width as i32,
-        _ => self.height as i32,
-    };
-
-    let other_horz = match other.direction {
-        Direction::East | Direction::West => other.height as i32,
-        _ => other.width as i32,
-    };
-    let other_vert = match other.direction {
-        Direction::East | Direction::West => other.width as i32,
-        _ => other.height as i32,
-    };
+    let self_box = self.bounding_box();
+    let other_box = other.bounding_box();
 
     match self.direction {
         Direction::North => {
-            let this_front = self.y; // top edge
-            let other_rear = other.y + other_vert; // other bottom edge
+            let this_front = self_box.top();            // my top edge
+            let other_rear = other_box.bottom();        // other bottom edge
             this_front <= other_rear + safe_distance
+                && self_box.x() < other_box.right()     // horizontal overlap
+                && self_box.right() > other_box.x()
         }
         Direction::South => {
-            let this_front = self.y + self_vert; // bottom edge
-            let other_rear = other.y; // other top edge
+            let this_front = self_box.bottom();         // my bottom edge
+            let other_rear = other_box.top();           // other top edge
             this_front >= other_rear - safe_distance
+                && self_box.x() < other_box.right()
+                && self_box.right() > other_box.x()
         }
         Direction::East => {
-            let this_front = self.x + self_horz; // right edge (horz size based on direction)
-            let other_rear = other.x; // other left edge
+            let this_front = self_box.right();          // my right edge
+            let other_rear = other_box.x();             // other left edge
             this_front >= other_rear - safe_distance
+                && self_box.y() < other_box.bottom()    // vertical overlap
+                && self_box.bottom() > other_box.y()
         }
         Direction::West => {
-            let this_front = self.x; // left edge
-            let other_rear = other.x + other_horz; // other right edge
+            let this_front = self_box.x();              // my left edge
+            let other_rear = other_box.right();         // other right edge
             this_front <= other_rear + safe_distance
+                && self_box.y() < other_box.bottom()
+                && self_box.bottom() > other_box.y()
         }
     }
 }
+
 
     pub fn distance_to_entry(&self) -> i32 {
         match self.direction {
