@@ -23,7 +23,7 @@ The project is implemented in Rust with real-time visualization using SDL2, prov
    ```
 
 ## User Guide
-[Watch demo video](assets/vid.mp4)
+[Watch demo video](./vid.mp4)
 - The simulation window will open, displaying the intersection and vehicles.
 - To generate a new vehicle, press the the appropriate key:
   - `W` | `Arrow Up`: Spawn a vehicle at the bottom heading North
