@@ -1,4 +1,5 @@
 use crate::intersection::{Direction, Route};
+use crate::consts::*;
 use chrono::{DateTime, Local};
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -30,8 +31,8 @@ pub struct Car<'b> {
 }
 
 impl<'a> Car<'a> {
-    const MAX_SPEED: i32 = 5;
-    const ENTRY_DISTANCE_PX: i32 = 350;
+    const MAX_SPEED: i32 = MAX_SPEED;
+    const ENTRY_DISTANCE_PX: i32 = ENTRY_DISTANCE_PX;
 
     pub fn new(
         id: String,
@@ -88,7 +89,7 @@ impl<'a> Car<'a> {
     }
 
     pub fn is_too_close(&self, other: &Car) -> bool {
-    let safe_distance = (self.speed).max(10);
+    let safe_distance = (self.speed).max(BRAKE_DISTANCE_PX);
 
     let self_box = self.bounding_box();
     let other_box = other.bounding_box();
@@ -136,11 +137,17 @@ impl<'a> Car<'a> {
     }
 
     fn is_at_entry_boundary(&self) -> bool {
+        let entry_distance = if self.route == Route::Right { 
+            crate::consts::ENTRY_DISTANCE_PX_RIGHT 
+        } else { 
+            crate::consts::ENTRY_DISTANCE_PX 
+        };
+        
         match self.direction {
-            Direction::North => self.y <= 550,
-            Direction::South => self.y + self.height as i32 >= 350,
-            Direction::East => self.x + self.height as i32 >= 350,
-            Direction::West => self.x <= 550,
+            Direction::North => self.y <= 900 - entry_distance,
+            Direction::South => self.y + self.height as i32 >= entry_distance,
+            Direction::East => self.x + self.height as i32 >= entry_distance,
+            Direction::West => self.x <= 900 - entry_distance,
         }
     }
     pub fn update(&mut self) {
@@ -231,7 +238,7 @@ impl<'a> Car<'a> {
         }
 
         if self.route == Route::Right {
-            self.speed = 7
+            self.speed = RIGHT_TURN_SPEED_PX;
         }
 
         match self.direction {
@@ -245,7 +252,7 @@ impl<'a> Car<'a> {
     fn update_right_turn(&mut self) {
         let distance_forward = self.distance_to_entry();
 
-        if self.turned || distance_forward < 350 {
+        if self.turned || distance_forward < RIGHT_TURN_ENTRY_DISTANCE_PX {
             self.update_straight();
         } else {
             match self.direction {
@@ -277,7 +284,7 @@ impl<'a> Car<'a> {
     fn update_left_turn(&mut self) {
         let distance_forward = self.distance_to_entry();
 
-        if self.turned || distance_forward < 500 {
+        if self.turned || distance_forward < LEFT_TURN_ENTRY_DISTANCE_PX {
             self.update_straight();
         } else {
             match self.direction {
@@ -329,9 +336,9 @@ impl<'a> Car<'a> {
             .unwrap();
 
         if !self.in_intersection {
-            canvas.set_draw_color(Color::RGB(255, 255, 0)); // Yellow for waiting
+            canvas.set_draw_color(Color::YELLOW); // Yellow for waiting
         } else {
-            canvas.set_draw_color(Color::RGB(0, 0, 255)); // Green for active
+            canvas.set_draw_color(Color::BLUE); // Blue for active
         }
         canvas.draw_rect(self.bounding_box()).unwrap();
 

@@ -5,11 +5,7 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
-
-const ZONE_LENGTH_PX: f64 = 50.0;
-const CAR_LENGTH_PX: f64 = 78.0;
-const SPEED_PX_PER_SEC: f64 = 300.0;
-const SAFE_DISTANCE_PX: f64 = 50.0 + (5.0 * 15.0);
+use crate::consts::*;
 
 pub type ZoneIndex = (usize, usize); // e.g., (2, 1)
 
@@ -127,9 +123,9 @@ impl CrossingManager {
                 let color = if has_active {
                     Color::RGB(160, 32, 240) // Purple (active)
                 } else if has_any {
-                    Color::RGB(255, 0, 0)    // Red (reserved, but inactive)
+                    Color::RED    // Red (reserved, but inactive)
                 } else {
-                    Color::RGB(0, 255, 0)    // Green (free)
+                    Color::GREEN    // Green (free)
                 };
 
                 canvas.set_draw_color(color);
@@ -143,25 +139,17 @@ impl CrossingManager {
 
 fn route_to_zone_path(dir: Direction, route: Route) -> Vec<ZoneIndex> {
     match (dir, route) {
-        (Direction::South, Route::Left) => vec![
-            (0,1), (1,1), (2,1), (2,2), (2,3)],
-        (Direction::South, Route::Straight) => vec![
-            (0,0), (1,0), (2,0), (3,0)],
+        (Direction::South, Route::Left) => ZONES_FOR_SOUTH_LEFT,
+        (Direction::South, Route::Straight) => ZONES_FOR_SOUTH_STRAIGHT,
 
-        (Direction::North, Route::Left) => vec![
-            (3,2), (2,2), (1,2), (1,1), (1,0)],
-        (Direction::North, Route::Straight) => vec![
-            (3,3), (2,3), (1,3), (0,3)],
+        (Direction::North, Route::Left) => ZONES_FOR_NORTH_LEFT,
+        (Direction::North, Route::Straight) => ZONES_FOR_NORTH_STRAIGHT,
 
-        (Direction::East, Route::Left)  => vec![
-            (2,0), (2,1), (2,2), (1,2), (0,2)],
-        (Direction::East, Route::Straight) => vec![
-            (3,0), (3,1), (3,2), (3,3)],
+        (Direction::East, Route::Left)  => ZONES_FOR_EAST_LEFT,
+        (Direction::East, Route::Straight) => ZONES_FOR_EAST_STRAIGHT,
 
-        (Direction::West, Route::Left) => vec![
-            (1,3), (1,2), (1,1), (2,1), (3,1)],
-        (Direction::West, Route::Straight) => vec![
-            (0,3), (0,2), (0,1), (0,0)],
+        (Direction::West, Route::Left) => ZONES_FOR_WEST_LEFT,
+        (Direction::West, Route::Straight) => ZONES_FOR_WEST_STRAIGHT,
 
         (_, Route::Right) => vec![],
     }

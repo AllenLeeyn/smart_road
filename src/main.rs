@@ -2,6 +2,7 @@ mod car;
 mod cars_id;
 mod intersection;
 mod crossing_manager;
+mod consts;
 use intersection::{Intersection, Direction};
 
 use sdl2::image::{InitFlag, LoadTexture};
@@ -21,7 +22,7 @@ pub fn main() {
     if args.len() > 1 {
         match args[1].as_str() {
             "test" => {
-                run_test_mode();
+                start_simulation(true);
                 return;
             }
             _ => {
@@ -33,10 +34,10 @@ pub fn main() {
     }
     
     // If no args, run normally
-    run_main_simulation();
+    start_simulation(false);
 }
 
-fn run_main_simulation() {
+fn start_simulation(is_test: bool) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     
@@ -56,6 +57,15 @@ fn run_main_simulation() {
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut intersection = Intersection::new();
+
+    if is_test {
+        test_loop(&mut event_pump, &mut intersection, &car_texture, &bg_texture, &mut canvas, &sdl_context);
+    } else {
+        normal_loop(&mut event_pump, &mut intersection, &car_texture, &bg_texture, &mut canvas, &sdl_context);
+    }
+}
+
+fn normal_loop<'a>(event_pump: &mut sdl2::EventPump, intersection: &mut Intersection<'a>, car_texture: &'a sdl2::render::Texture<'a>, bg_texture: &sdl2::render::Texture, canvas: &mut sdl2::render::Canvas<sdl2::video::Window>, sdl_context: &sdl2::Sdl) {
     'running: loop {
         let events: Vec<_> = event_pump.poll_iter().collect();
 
@@ -65,23 +75,23 @@ fn run_main_simulation() {
 
                 Event::KeyDown { keycode: Some(key), .. } => match key {
                     Keycode::Escape => { 
-                        show_statistics(&intersection, &sdl_context, &mut event_pump);
+                        show_statistics(&intersection, sdl_context, event_pump);
                         break 'running
                     },
                     Keycode::Down | Keycode::S => {
-                        intersection.add_car_in(Direction::South, &car_texture);
+                        intersection.add_car_in(Direction::South, &car_texture, false);
                     }
                     Keycode::Up | Keycode::W => {
-                        intersection.add_car_in(Direction::North, &car_texture);
+                        intersection.add_car_in(Direction::North, &car_texture, false);
                     }
                     Keycode::Left | Keycode::A => {
-                        intersection.add_car_in(Direction::West, &car_texture);
+                        intersection.add_car_in(Direction::West, &car_texture, false);
                     }
                     Keycode::Right | Keycode::D => {
-                        intersection.add_car_in(Direction::East, &car_texture);
+                        intersection.add_car_in(Direction::East, &car_texture, false);
                     }
                     Keycode::R => {
-                        intersection.add_car_in_rnd(&car_texture);
+                        intersection.add_car_in_rnd(&car_texture, false);
                     }
                     _ => {} // Ignore other keys
                 },
@@ -93,49 +103,27 @@ fn run_main_simulation() {
         intersection.update();
 
         canvas.clear();
-        canvas.copy(&bg_texture, None, None).unwrap();
-        intersection.draw(&mut canvas);
+        canvas.copy(bg_texture, None, None).unwrap();
+        intersection.draw(canvas);
         canvas.present();
 
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 }
 
-fn run_test_mode() {
-    println!("=== TEST MODE ===");
-
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
-    
-    let _img_ctx = sdl2::image::init(InitFlag::PNG);
-
-    let window = video_subsystem.window("smart-road", 900, 900)
-        .position_centered()
-        .build()
-        .unwrap();
-
-    let mut canvas = window.into_canvas().build().unwrap();
-    
-    // Load the background texture
-    let texture_creator = canvas.texture_creator();
-    let bg_texture = texture_creator.load_texture("assets/bg.png").unwrap();
-    let car_texture = texture_creator.load_texture("assets/car.png").unwrap();
-
-    let mut event_pump = sdl_context.event_pump().unwrap();
-    let mut intersection = Intersection::new();
-
+fn test_loop<'a>(event_pump: &mut sdl2::EventPump, intersection: &mut Intersection<'a>, car_texture: &'a sdl2::render::Texture<'a>, bg_texture: &sdl2::render::Texture, canvas: &mut sdl2::render::Canvas<sdl2::video::Window>, sdl_context: &sdl2::Sdl) {
     let start_time = SystemTime::now();
-    let end_time = SystemTime::now() + Duration::from_secs(10);
-
-    let mut success = false;
-
+    let end_time = start_time + Duration::from_secs(10);
+    let success: bool;
+    
     loop {
-        intersection.add_car_in_rnd(&car_texture);
+        intersection.add_car_in_rnd(car_texture, true);
         intersection.update();
         canvas.clear();
-        canvas.copy(&bg_texture, None, None).unwrap();
-        intersection.draw(&mut canvas);
+        canvas.copy(bg_texture, None, None).unwrap();
+        intersection.draw(canvas);
         canvas.present();
+        
         if intersection.cars_out.len() > 10000 {
             println!("10000 cars have crossed the intersection, no issues found");
             success = true;
@@ -143,7 +131,7 @@ fn run_test_mode() {
         } else if intersection.collision_count > 0 {
             println!("Collision detected");
             let collided_cars = intersection.cars_in.values().flatten().filter(|car| car.collided).collect::<Vec<&Car>>();
-            println!("Collided cars: {:?}", collided_cars.len());
+            println!("Collided cars: {}", collided_cars.len());
             for car in collided_cars {
                 println!("Collision at: {} {:?}", car.id, car.direction);
             }
@@ -155,11 +143,12 @@ fn run_test_mode() {
             break;
         }
     }
+    
     if success {
         println!("Test passed");
-        show_statistics(&intersection, &sdl_context, &mut event_pump);
     } else {
         println!("Test failed");
+        show_statistics(intersection, sdl_context, event_pump);
     }
 }
 
