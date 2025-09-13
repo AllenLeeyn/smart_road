@@ -10,6 +10,8 @@ use sdl2::keyboard::Keycode;
 use std::time::Duration;
 use std::env;
 
+// For testing
+use car::Car;
 use std::time::SystemTime;
 
 pub fn main() {
@@ -125,18 +127,40 @@ fn run_test_mode() {
     let start_time = SystemTime::now();
     let end_time = SystemTime::now() + Duration::from_secs(10);
 
-    while intersection.cars_out.len() < 10000 {
+    let mut success = false;
+
+    loop {
         intersection.add_car_in_rnd(&car_texture);
         intersection.update();
         canvas.clear();
         canvas.copy(&bg_texture, None, None).unwrap();
         intersection.draw(&mut canvas);
         canvas.present();
-        if SystemTime::now() > end_time {
+        if intersection.cars_out.len() > 10000 {
+            println!("10000 cars have crossed the intersection, no issues found");
+            success = true;
+            break;
+        } else if intersection.collision_count > 0 {
+            println!("Collision detected");
+            let collided_cars = intersection.cars_in.values().flatten().filter(|car| car.collided).collect::<Vec<&Car>>();
+            println!("Collided cars: {:?}", collided_cars.len());
+            for car in collided_cars {
+                println!("Collision at: {} {:?}", car.id, car.direction);
+            }
+            success = false;
+            break;
+        } else if SystemTime::now() > end_time {
+            println!("10 seconds have passed");
+            success = false;
             break;
         }
     }
-    show_statistics(&intersection, &sdl_context, &mut event_pump);
+    if success {
+        println!("Test passed");
+        show_statistics(&intersection, &sdl_context, &mut event_pump);
+    } else {
+        println!("Test failed");
+    }
 }
 
 use sdl2::ttf::Font;
