@@ -10,7 +10,7 @@ const ZONE_LENGTH_PX: f64 = 50.0;
 const CAR_LENGTH_PX: f64 = 78.0;
 const MAX_SPEED: f64 = 5.0;
 const SPEED_PX_PER_SEC: f64 = MAX_SPEED * 60.0;
-const SAFE_DISTANCE_PX: f64 = CAR_LENGTH_PX;
+const SAFE_DISTANCE_PX: f64 = CAR_LENGTH_PX/2.0;
 
 pub type ZoneIndex = (usize, usize);
 

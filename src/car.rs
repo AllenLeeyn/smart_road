@@ -214,7 +214,7 @@ impl<'b> Car<'b> {
             self.speed = (self.speed - max_acceleration).max(target_speed).max(0);
         }
 
-        if self.route == Route::Right { self.speed = 5 * 60 }
+        if self.route == Route::Right { self.speed = 6 * 60 }
         let distance = (self.speed as f64 * seconds).round() as i32;
 
         match self.direction {
@@ -316,7 +316,9 @@ impl<'b> Car<'b> {
             .copy_ex(&self.texture, None, dest, angle, None, false, false)
             .unwrap();
 
-        if self.brake {
+        if self.collided {
+            canvas.set_draw_color(Color::RGB(255, 0, 255)); // 💥 Magenta for collision
+        } else if self.brake {
             canvas.set_draw_color(Color::RGB(255, 0, 0)); // Green for active
         } else if !self.in_intersection {
             canvas.set_draw_color(Color::RGB(255, 255, 0)); // Yellow for waiting

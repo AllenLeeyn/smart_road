@@ -152,9 +152,6 @@ impl<'a> Intersection<'a> {
         for queue in self.cars_in.values_mut() {
             let mut i = 0;
 
-            // Collect car IDs before the loop to avoid borrow checker issues
-            let car_ids: Vec<_> = queue.iter().map(|c| &c.id).collect();
-
             while i < queue.len() {
                 // Check if there's a front car and if current car should brake
                 let should_brake = if i > 0 {
@@ -199,59 +196,68 @@ impl<'a> Intersection<'a> {
 
     pub fn get_statistics(&self) -> String {
         let cars = &self.cars_out;
-
         let total = cars.len();
 
         if total == 0 {
             return "📊 No vehicles have crossed the intersection yet.".to_string();
         }
 
-        // Initialize with first car's values
         let mut min_speed = f32::MAX;
         let mut max_speed = f32::MIN;
+        let mut total_speed = 0.0;
 
         let mut min_duration = Duration::MAX;
         let mut max_duration = Duration::ZERO;
+        let mut total_duration = Duration::ZERO;
 
         for car in cars {
             if let Some(exit_time) = car.time_exit {
                 if let Ok(duration) = exit_time.duration_since(car.time_enter) {
-                    // Convert duration to seconds as f32
                     let duration_secs = duration.as_secs_f32();
 
                     if duration_secs > 0.0 {
                         let distance = car.dist as f32;
                         let effective_speed = distance / duration_secs;
 
-                        // Update speed stats
                         min_speed = min_speed.min(effective_speed);
                         max_speed = max_speed.max(effective_speed);
+                        total_speed += effective_speed;
                     }
 
-                    // Update duration stats
                     min_duration = min_duration.min(duration);
                     max_duration = max_duration.max(duration);
+                    total_duration += duration;
                 }
             }
         }
 
+        let avg_speed = total_speed / total as f32;
+
+        let avg_duration_secs = total_duration.as_secs_f32() / total as f32;
+
         format!(
             "Intersection Statistics\n\
-             -----------------------------\n\
-             Vehicles Crossed: {}\n\
-             Collisions: {}\n\
-             Near misses: {}\n\
-             Max Speed: {} px/s\n\
-             Min Speed: {} px/s\n\
-             Max Time in Intersection: {} s\n\
-             Min Time in Intersection: {} s",
+            -----------------------------\n\
+            Vehicles Crossed: {}\n\
+            Collisions: {}\n\
+            Near Misses: {}\n\
+            \n\
+            Max Speed: {} px/s\n\
+            Min Speed: {} px/s\n\
+            Avg Speed: {} px/s\n\
+            \n\
+            Max Time in Intersection: {} s\n\
+            Min Time in Intersection: {} s\n\
+            Avg Time in Intersection: {} s",
             total,
             self.collision_count,
             self.near_miss,
             round_two(max_speed),
             round_two(min_speed),
+            round_two(avg_speed),
+            round_two(max_duration.as_secs_f32()),
             round_two(min_duration.as_secs_f32()),
-            round_two(max_duration.as_secs_f32())
+            round_two(avg_duration_secs)
         )
     }
 }

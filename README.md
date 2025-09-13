@@ -1,98 +1,80 @@
 # smart_road
 
-## SDL2 Setup
-We use environment variables to tell rust where the sdl2 libraries are. We use this to implement consistent setup and both macOS and Windows. Below are how to install the sdl2 libraries and set up the required environment variables. The varibles we need are: `SDL2_LIB_PATH`, `SDL2_IMAGE_LIB_PATH` and `SDL2_TTF_LIB_PATH`.
+## Introduction
+This Rust project simulates a smart intersection system designed to manage the flow of autonomous vehicles (AVs). The simulation uses a Crossing Manager that assigns time slots to approaching vehicles, coordinating their movements to safely and efficiently cross the intersection without collisions.
 
-### SDL2 for macOS
-This guide walks you through installing SDL2 and its extensions (SDL2_image, SDL2_ttf) via Homebrew, and configuring your environment so your Rust project can build and link properly.
+Instead of relying on traditional traffic signals, the Crossing Manager divides the intersection’s conflict area into collision zones. Vehicles are given specific entry times into these zones, ensuring that no two vehicles occupy the same zone at the same time. This models how future AV-dominated road systems could operate using precise timing and spatial awareness.
 
-#### Step 1: Install SDL2 Libraries
-Open a terminal and run:
-```bash
-    brew install sdl2 sdl2_image sdl2_ttf
-```
+The project is implemented in Rust with real-time visualization using SDL2, providing an interactive view of the system’s behavior.
 
-You can verify the installation with:
-```bash
-brew --prefix sdl2
-brew --prefix sdl2_image
-brew --prefix sdl2_ttf
-```
+## Prerequisites
+- Rust and Cargo installed. Follow instructions at https://www.rust-lang.org/tools/install
+- [SDL2 libraries installed](./sdl2-setup.md). See below for setup instructions.
+- Download or clone this repository https://github.com/AllenLeeyn/smart_road
 
-You should see:
-```bash
-/opt/homebrew/opt/sdl2
-/opt/homebrew/opt/sdl2_image
-/opt/homebrew/opt/sdl2_ttf
-```
+## Running the Simulation
+1. Navigate to the project directory:
+   ```bash
+    cd smart_road
+   ``` 
+2. Build and run the project using Cargo:
+   ```bash
+    cargo run
+   ```
 
-#### Step 2: Set Environment Variables
-These variables tell Rust where to find the native libraries for linking.
+## User Guide
+[Watch demo video](assets/vid.mp4)
+- The simulation window will open, displaying the intersection and vehicles.
+- To generate a new vehicle, press the the appropriate key:
+  - `W` | `Arrow Up`: Spawn a vehicle at the bottom heading North
+  - `A` | `Arrow Left`: Spawn a vehicle at the right heading West
+  - `S` | `Arrow Down`: Spawn a vehicle at the top heading South
+  - `D` | `Arrow Right`: Spawn a vehicle at the left hading East
+  - `R`: Spawn a vehicle at a random direction
+  - Press `Esc` to show the stats of the simulation. Press `Esc` again to stop simulation.
 
-Temporary (for current terminal session):
-```bash
-export SDL2_LIB_PATH=/opt/homebrew/opt/sdl2/lib
-export SDL2_IMAGE_LIB_PATH=/opt/homebrew/opt/sdl2_image/lib
-export SDL2_TTF_LIB_PATH=/opt/homebrew/opt/sdl2_ttf/lib
-```
+- Each road (direction) has three route (lanes): turn left, go straight, turn right. Vehicles are randomly assigned a route when spawned. Different color vehicle represent different routes:
+    - `Red`: Turn right
+    - `Saffron`: Go straight
+    - `Lavender`: Turn left
 
-Permanent (for all sessions):
+- bounding box of vehicles and zones are shown for debugging purposes.
+    - For vehicle:
+        - `Yellow`: approaching/ waiting
+        - `Blue`: crossing/ exited
+        - `Red`: braking
+    - For zones:
+        - `Green`: free
+        - `Purple`: reserved
+        - `Red`: occupied
+- When a collision is detected, the vehicles will stop moving.
+- Stats displayed when pressing `Esc`:
+    - `Vehicles crossed`: number of vehicles that reached the other side of the intersection
+    - `Collisions`: number of collisions detected (should be 0)
+    - `Near misses`: number of times brakes are applied to avoid collision
+    - `Max Speed`: maximum speed (px/sec) reached by any vehicle
+    - `Min Speed`: minimum speed (px/sec) reached by any vehicle
+    - `Average Speed`: average speed (px/sec) of all vehicles
+    - `Max time in intersection`: maximum time (sec) taken by any vehicle to cross the intersection
+    - `Min time in intersection`: minimum time (sec) taken by any vehicle to cross the intersection
+    - `Average time in intersection`: average time (sec) taken by all vehicles to cross the intersection
 
-Add the following lines to your shell config file (e.g. ~/.zshrc or ~/.bashrc):
-```bash
-# SDL2 library paths
-export SDL2_LIB_PATH=/opt/homebrew/opt/sdl2/lib
-export SDL2_IMAGE_LIB_PATH=/opt/homebrew/opt/sdl2_image/lib
-export SDL2_TTF_LIB_PATH=/opt/homebrew/opt/sdl2_ttf/lib
-```
+## Limitations & Disclaimer
+This simulation makes several simplifying assumptions to focus on demonstrating time-slot based intersection control. As such, it does not fully reflect real-world traffic dynamics:
 
-Then apply changes:
-```bash
-source ~/.zshrc   # or source ~/.bashrc
-```
+### Vehicle Behavior
+- **Constant Speed in Intersection**: Once an AV enters the intersection, it maintains a constant speed. This assumes the AV has already accelerated to its desired speed at the entry point of the intersection. In a real-world scenario, AVs may dynamically adjust their speed based on road conditions, other vehicles, or sensor feedback, but such behavior is beyond the scope of this simulation.
+- **No Curved Turns**: Vehicles perform instant 90-degree turns instead of realistic curved turning paths. This design choice follows the example specification and is assumed to be acceptable within the project’s scope. Curved turns could be simulated by reserving additional zones along an arc.
 
-### SDL2 for Windows
-#### Step 1: Install SDL2 Libraries
-Install vcpkg and set it up (or other ways you prefer):
-```powershell
-vcpkg install sdl2 sdl2-image sdl2-ttf
-```
+### Vehicle Characteristics
+- **Uniform Vehicle Size**: All vehicles have the same dimensions. While supporting different sizes is possible, the time-slot and zone allocation logic would need further abstraction and adaptation to handle varied lengths or widths safely.
 
-#### Step 2: Set Environment Variables
-Set environment variables (PowerShell):
-```powershell
-$env:SDL2_LIB_PATH="C:\path\to\vcpkg\installed\x64-windows\lib"
-$env:SDL2_IMAGE_LIB_PATH="C:\path\to\vcpkg\installed\x64-windows\lib"
-$env:SDL2_TTF_LIB_PATH="C:\path\to\vcpkg\installed\x64-windows\lib"
-```
+### Environment Constraints
+- **No Pedestrians or Mixed Traffic**: The simulation handles only autonomous vehicles. There are no pedestrians, bicycles, human-driven vehicles, or traffic signals.
+- **Single Intersection Only**: The simulation models only a single 4-way intersection. Expanding this to a city grid or multiple connected intersections would require major architectural changes.
 
+## Collaborators 
+- Allen [@AllenLeeyn](https://github.com/AllenLeeyn)
+- Roope [@RuBoMa](https://github.com/RuBoMa)
+- Johannes [@JSundb](https://github.com/JSundb)
 
-I am currently working on a smart_road project. where i need to program a intersection crossing program for AVs. 
-Refer to here for details: https://github.com/01-edu/public/blob/master/subjects/smart-road/README.md
-
-The intersection is 4 way with 3 lanes (turn left, turn right, go straight).
-Each lane is 50 px wide. A road is 300 px wide (50 x 6) to accomodate for two way traffic.
-For simplicity, all cars are 80px long.
-
-I have decided to use a time slot reservation for crossing.
-Each car has to maintain a safety distance of 50 px plus the dist base on its current speed.
-Right turns will never be obstructed as they never have to worry about incoming traffic.
-we set a max speed of 7 px/ frame for all cars.
-Only straight and turn left need slot reservation. Thus a 4 x 4 zone...
-Cars should accelerate to 7px/ frame as they approach the crossing.
-After they enter the crossing, we assume they all travel at 7px/ frame for consistent calculation.
-
-The program is written in rust.
-I have:
-car.rs (car struct and logic)
-cars_id.rs (car_id generation. we use the id as a ref for removing a car in the reservation list)
-crossing_manager.rs (creating the zones and reservation logic)
-itersection.rs (create the roads and spawning of cars)
-
-i will share the details of each file.
-For now, just remember the files and context and wait for my prompt (unless there is something critical)
-
-we need to implement:
-resevation logic is faulty
-need better speed calculation
-rear end check

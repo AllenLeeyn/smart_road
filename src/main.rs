@@ -102,7 +102,8 @@ use sdl2::rect::Rect;
 fn show_statistics(
     intersection: &Intersection,
     sdl_context: &sdl2::Sdl,
-    event_pump: &mut sdl2::EventPump,) {
+    event_pump: &mut sdl2::EventPump
+) {
     let video_subsystem = sdl_context.video().unwrap();
     let ttf_context = sdl2::ttf::init().unwrap();
 
@@ -136,8 +137,8 @@ fn show_statistics(
     'stat_loop: loop {
         for event in event_pump.poll_iter() {
             match event {
-            Event::Quit { .. } => break 'stat_loop,
-            Event::KeyDown { keycode: Some(Keycode::Escape), .. } => break 'stat_loop,
+                Event::Quit { .. } => break 'stat_loop,
+                Event::KeyDown { keycode: Some(Keycode::Escape), .. } => break 'stat_loop,
                 _ => {}
             }
         }
