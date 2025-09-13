@@ -8,18 +8,43 @@ use sdl2::image::{InitFlag, LoadTexture};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use std::time::Duration;
- 
+use std::env;
+
+use std::time::SystemTime;
+
 pub fn main() {
+    // Using args because I was having issues with normal/official testing
+    let args: Vec<String> = env::args().collect();
+    
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "test" => {
+                run_test_mode();
+                return;
+            }
+            _ => {
+                println!("Unknown command: {}", args[1]);
+                println!("Either run the program without arguments or use 'cargo run test'");
+                return;
+            }
+        }
+    }
+    
+    // If no args, run normally
+    run_main_simulation();
+}
+
+fn run_main_simulation() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     
     let _img_ctx = sdl2::image::init(InitFlag::PNG);
- 
+
     let window = video_subsystem.window("smart-road", 900, 900)
         .position_centered()
         .build()
         .unwrap();
- 
+
     let mut canvas = window.into_canvas().build().unwrap();
     
     // Load the background texture
@@ -72,6 +97,46 @@ pub fn main() {
 
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
+}
+
+fn run_test_mode() {
+    println!("=== TEST MODE ===");
+
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
+    
+    let _img_ctx = sdl2::image::init(InitFlag::PNG);
+
+    let window = video_subsystem.window("smart-road", 900, 900)
+        .position_centered()
+        .build()
+        .unwrap();
+
+    let mut canvas = window.into_canvas().build().unwrap();
+    
+    // Load the background texture
+    let texture_creator = canvas.texture_creator();
+    let bg_texture = texture_creator.load_texture("assets/bg.png").unwrap();
+    let car_texture = texture_creator.load_texture("assets/car.png").unwrap();
+
+    let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut intersection = Intersection::new();
+
+    let start_time = SystemTime::now();
+    let end_time = SystemTime::now() + Duration::from_secs(10);
+
+    while intersection.cars_out.len() < 10000 {
+        intersection.add_car_in_rnd(&car_texture);
+        intersection.update();
+        canvas.clear();
+        canvas.copy(&bg_texture, None, None).unwrap();
+        intersection.draw(&mut canvas);
+        canvas.present();
+        if SystemTime::now() > end_time {
+            break;
+        }
+    }
+    show_statistics(&intersection, &sdl_context, &mut event_pump);
 }
 
 use sdl2::ttf::Font;
