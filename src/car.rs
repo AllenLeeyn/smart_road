@@ -1,10 +1,10 @@
-use sdl2::render::{Canvas, Texture};
-use sdl2::pixels::Color;
-use sdl2::rect::{Rect};
-use sdl2::video::Window;
-use crate::intersection::{Route, Direction};
-use std::time::{SystemTime, Duration};
+use crate::intersection::{Direction, Route};
 use chrono::{DateTime, Local};
+use sdl2::pixels::Color;
+use sdl2::rect::Rect;
+use sdl2::render::{Canvas, Texture};
+use sdl2::video::Window;
+use std::time::{Duration, SystemTime};
 
 pub struct Car<'b> {
     pub id: String,
@@ -19,6 +19,7 @@ pub struct Car<'b> {
     pub turned: bool,
     pub exited: bool,
     pub collided: bool,
+    pub brake: bool,
 
     pub time_enter: SystemTime,
     pub time_exit: Option<SystemTime>,
@@ -29,7 +30,7 @@ pub struct Car<'b> {
 }
 
 impl<'b> Car<'b> {
-    const MAX_SPEED: i32 = 5;
+    const MAX_SPEED: i32 = 5; // change this to seven for brake testing
     const ENTRY_DISTANCE_PX: i32 = 350;
 
     pub fn new(
@@ -44,11 +45,25 @@ impl<'b> Car<'b> {
         };
 
         Car {
-            id, x, y, width, height,
-            speed, texture,
-            route, direction, turned: false, exited: false, collided: false,
-            time_enter: SystemTime::now(), time_exit: None, entry_time, in_intersection: false,
-            dist, actual_entry_time: None,
+            id,
+            x,
+            y,
+            width,
+            height,
+            speed,
+            texture,
+            route,
+            direction,
+            turned: false,
+            exited: false,
+            collided: false,
+            time_enter: SystemTime::now(),
+            time_exit: None,
+            entry_time,
+            in_intersection: false,
+            dist,
+            actual_entry_time: None,
+            brake: false,
         }
     }
 
@@ -61,16 +76,54 @@ impl<'b> Car<'b> {
         Rect::new(self.x, self.y, w, h)
     }
 
-        pub fn intersects(&self, other: &Car) -> bool {
-            self.bounding_box().has_intersection(other.bounding_box())
+    pub fn intersects(&self, other: &Car) -> bool {
+        self.bounding_box().has_intersection(other.bounding_box())
+    }
+
+    pub fn is_too_close(&self, other: &Car) -> bool {
+        let safe_distance = 10; // change this to 20 for brake testing
+
+        let self_box = self.bounding_box();
+        let other_box = other.bounding_box();
+
+        match self.direction {
+            Direction::North => {
+                let this_front = self_box.top();            // my top edge
+                let other_rear = other_box.bottom();        // other bottom edge
+                this_front <= other_rear + safe_distance
+                    && self_box.x() < other_box.right()     // horizontal overlap
+                    && self_box.right() > other_box.x()
+            }
+            Direction::South => {
+                let this_front = self_box.bottom();         // my bottom edge
+                let other_rear = other_box.top();           // other top edge
+                this_front >= other_rear - safe_distance
+                    && self_box.x() < other_box.right()
+                    && self_box.right() > other_box.x()
+            }
+            Direction::East => {
+                let this_front = self_box.right();          // my right edge
+                let other_rear = other_box.x();             // other left edge
+                this_front >= other_rear - safe_distance
+                    && self_box.y() < other_box.bottom()    // vertical overlap
+                    && self_box.bottom() > other_box.y()
+            }
+            Direction::West => {
+                let this_front = self_box.x();              // my left edge
+                let other_rear = other_box.right();         // other right edge
+                this_front <= other_rear + safe_distance
+                    && self_box.y() < other_box.bottom()
+                    && self_box.bottom() > other_box.y()
+            }
         }
+    }
 
     pub fn distance_to_entry(&self) -> i32 {
         match self.direction {
             Direction::North => 900 - self.y,
             Direction::South => self.y + self.height as i32,
-            Direction::East  => self.x + self.height as i32,
-            Direction::West  => 900 - self.x,
+            Direction::East => self.x + self.height as i32,
+            Direction::West => 900 - self.x,
         }
     }
 
@@ -78,12 +131,12 @@ impl<'b> Car<'b> {
         match self.direction {
             Direction::North => self.y <= 550,
             Direction::South => self.y + self.height as i32 >= 350,
-            Direction::East  => self.x + self.height as i32 >= 350,
-            Direction::West  => self.x <= 550,
+            Direction::East => self.x + self.height as i32 >= 350,
+            Direction::West => self.x <= 550,
         }
     }
     pub fn update(&mut self, delta_time: Duration) {
-        if self.exited {
+        if self.exited || self.brake {
             return;
         }
 
@@ -109,7 +162,9 @@ impl<'b> Car<'b> {
             _ => {}
         }
 
-        if self.exited { self.time_exit = Some(SystemTime::now()); }
+        if self.exited {
+            self.time_exit = Some(SystemTime::now());
+        }
     }
 
     fn update_straight(&mut self, delta_time: Duration) {
@@ -122,7 +177,9 @@ impl<'b> Car<'b> {
 
             let actual_dt: DateTime<Local> = now.into();
             let scheduled_dt: DateTime<Local> = self.entry_time.into();
-            let diff = self.entry_time.duration_since(now)
+            let diff = self
+                .entry_time
+                .duration_since(now)
                 .map(|d| -(d.as_secs_f64()))
                 .unwrap_or_else(|e| e.duration().as_secs_f64());
 
@@ -136,7 +193,8 @@ impl<'b> Car<'b> {
         }
 
         let distance_to_entry = (Self::ENTRY_DISTANCE_PX - self.distance_to_entry()).max(0);
-        let time_left = self.entry_time
+        let time_left = self
+            .entry_time
             .duration_since(now)
             .unwrap_or(Duration::ZERO)
             .as_secs_f64();
@@ -242,7 +300,9 @@ impl<'b> Car<'b> {
         // Offset position to account for center-based rotation
         let (offset_x, offset_y) = match self.direction {
             Direction::North | Direction::South => (0, 0),
-            Direction::East | Direction::West => ((h as i32 - w as i32) / 2, -(h as i32 - w as i32) / 2),
+            Direction::East | Direction::West => {
+                ((h as i32 - w as i32) / 2, -(h as i32 - w as i32) / 2)
+            }
         };
         let dest = Rect::new(self.x + offset_x, self.y + offset_y, w, h);
         let angle = match self.direction {
@@ -255,8 +315,10 @@ impl<'b> Car<'b> {
         canvas
             .copy_ex(&self.texture, None, dest, angle, None, false, false)
             .unwrap();
-            
-        if !self.in_intersection {
+
+        if self.brake {
+            canvas.set_draw_color(Color::RGB(255, 0, 0)); // Green for active
+        } else if !self.in_intersection {
             canvas.set_draw_color(Color::RGB(255, 255, 0)); // Yellow for waiting
         } else {
             canvas.set_draw_color(Color::RGB(0, 0, 255)); // Green for active
@@ -265,7 +327,12 @@ impl<'b> Car<'b> {
 
         canvas.set_draw_color(Color::BLUE);
         let origin_size = 4; // small square
-        let origin = Rect::new(self.x - origin_size / 2, self.y - origin_size / 2, origin_size as u32, origin_size as u32);
+        let origin = Rect::new(
+            self.x - origin_size / 2,
+            self.y - origin_size / 2,
+            origin_size as u32,
+            origin_size as u32,
+        );
         canvas.fill_rect(origin).unwrap();
     }
 }
