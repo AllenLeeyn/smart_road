@@ -139,17 +139,17 @@ impl CrossingManager {
 
 fn route_to_zone_path(dir: Direction, route: Route) -> Vec<ZoneIndex> {
     match (dir, route) {
-        (Direction::South, Route::Left) => ZONES_FOR_SOUTH_LEFT,
-        (Direction::South, Route::Straight) => ZONES_FOR_SOUTH_STRAIGHT,
+        (Direction::South, Route::Left) => ZONES_FOR_SOUTH_LEFT.to_vec(),
+        (Direction::South, Route::Straight) => ZONES_FOR_SOUTH_STRAIGHT.to_vec(),
 
-        (Direction::North, Route::Left) => ZONES_FOR_NORTH_LEFT,
-        (Direction::North, Route::Straight) => ZONES_FOR_NORTH_STRAIGHT,
+        (Direction::North, Route::Left) => ZONES_FOR_NORTH_LEFT.to_vec(),
+        (Direction::North, Route::Straight) => ZONES_FOR_NORTH_STRAIGHT.to_vec(),
 
-        (Direction::East, Route::Left)  => ZONES_FOR_EAST_LEFT,
-        (Direction::East, Route::Straight) => ZONES_FOR_EAST_STRAIGHT,
+        (Direction::East, Route::Left)  => ZONES_FOR_EAST_LEFT.to_vec(),
+        (Direction::East, Route::Straight) => ZONES_FOR_EAST_STRAIGHT.to_vec(),
 
-        (Direction::West, Route::Left) => ZONES_FOR_WEST_LEFT,
-        (Direction::West, Route::Straight) => ZONES_FOR_WEST_STRAIGHT,
+        (Direction::West, Route::Left) => ZONES_FOR_WEST_LEFT.to_vec(),
+        (Direction::West, Route::Straight) => ZONES_FOR_WEST_STRAIGHT.to_vec(),
 
         (_, Route::Right) => vec![],
     }

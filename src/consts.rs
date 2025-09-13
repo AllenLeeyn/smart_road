@@ -1,3 +1,5 @@
+use crate::crossing_manager::ZoneIndex;
+
 pub const MAX_SPEED: i32 = 5;
 pub const BRAKE_DISTANCE_PX: i32 = 20;
 
@@ -33,14 +35,14 @@ pub const SPAWN_POSITION_WEST_STRAIGHT: (i32, i32, i32) = (900, 358, 5);
 pub const SPAWN_POSITION_WEST_RIGHT: (i32, i32, i32) = (900, 308, 7);
 
 
-pub const ZONES_FOR_SOUTH_LEFT: Vec<ZoneIndex> = vec![(0,1), (1,1), (2,1), (2,2), (2,3)];
-pub const ZONES_FOR_SOUTH_STRAIGHT: Vec<ZoneIndex> = vec![(0,0), (1,0), (2,0), (3,0)];
+pub const ZONES_FOR_SOUTH_LEFT: &[ZoneIndex] = &[(0,1), (1,1), (2,1), (2,2), (2,3)];
+pub const ZONES_FOR_SOUTH_STRAIGHT: &[ZoneIndex] = &[(0,0), (1,0), (2,0), (3,0)];
 
-pub const ZONES_FOR_NORTH_LEFT: Vec<ZoneIndex> = vec![(3,2), (2,2), (1,2), (1,1), (1,0)];
-pub const ZONES_FOR_NORTH_STRAIGHT: Vec<ZoneIndex> = vec![(3,3), (2,3), (1,3), (0,3)];
+pub const ZONES_FOR_NORTH_LEFT: &[ZoneIndex] = &[(3,2), (2,2), (1,2), (1,1), (1,0)];
+pub const ZONES_FOR_NORTH_STRAIGHT: &[ZoneIndex] = &[(3,3), (2,3), (1,3), (0,3)];
 
-pub const ZONES_FOR_EAST_LEFT: Vec<ZoneIndex> = vec![(2,0), (2,1), (2,2), (1,2), (0,2)];
-pub const ZONES_FOR_EAST_STRAIGHT: Vec<ZoneIndex> = vec![(3,0), (3,1), (3,2), (3,3)];
+pub const ZONES_FOR_EAST_LEFT: &[ZoneIndex] = &[(2,0), (2,1), (2,2), (1,2), (0,2)];
+pub const ZONES_FOR_EAST_STRAIGHT: &[ZoneIndex] = &[(3,0), (3,1), (3,2), (3,3)];
 
-pub const ZONES_FOR_WEST_LEFT: Vec<ZoneIndex> = vec![(1,3), (1,2), (1,1), (2,1), (3,1)];
-pub const ZONES_FOR_WEST_STRAIGHT: Vec<ZoneIndex> = vec![(0,3), (0,2), (0,1), (0,0)];
+pub const ZONES_FOR_WEST_LEFT: &[ZoneIndex] = &[(1,3), (1,2), (1,1), (2,1), (3,1)];
+pub const ZONES_FOR_WEST_STRAIGHT: &[ZoneIndex] = &[(0,3), (0,2), (0,1), (0,0)];

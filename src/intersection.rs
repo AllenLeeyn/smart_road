@@ -244,8 +244,8 @@ impl<'a> Intersection<'a> {
             self.collision_count,
             round_two(max_speed),
             round_two(min_speed),
-            round_two(min_duration.as_secs_f32()),
-            round_two(max_duration.as_secs_f32())
+            round_two(max_duration.as_secs_f32()),
+            round_two(min_duration.as_secs_f32())
         )
     }
 }
