@@ -8,14 +8,15 @@ use sdl2::video::Window;
 
 const ZONE_LENGTH_PX: f64 = 50.0;
 const CAR_LENGTH_PX: f64 = 78.0;
-const SPEED_PX_PER_SEC: f64 = 300.0;
-const SAFE_DISTANCE_PX: f64 = 50.0 + (5.0 * 15.0);
+const MAX_SPEED: f64 = 5.0;
+const SPEED_PX_PER_SEC: f64 = MAX_SPEED * 60.0;
+const SAFE_DISTANCE_PX: f64 = CAR_LENGTH_PX;
 
-pub type ZoneIndex = (usize, usize); // e.g., (2, 1)
+pub type ZoneIndex = (usize, usize);
 
 #[derive(Clone)]
 pub struct ZoneReservation {
-    pub _car_id: String,                   // Unique ID
+    pub _car_id: String,
     pub time_in: SystemTime,
     pub time_out: SystemTime,
 }
@@ -51,7 +52,7 @@ impl CrossingManager {
         let base_time = 'try_time: loop {
             for (i, zone) in path.iter().enumerate() {
                 let zone_entry_time = base_time + zone_time * i as u32;
-                let zone_exit_time = zone_entry_time + car_occupy_time + safe_time_gap;
+                let zone_exit_time = zone_entry_time  + zone_time + car_occupy_time + safe_time_gap;
 
                 if let Some(res_list) = self.grid.get(zone) {
                     for res in res_list {
@@ -180,7 +181,7 @@ pub fn generate_zone_reservations(
 
     for (i, &zone) in path.iter().enumerate() {
         let time_in = entry_time + zone_time * i as u32;
-        let time_out = time_in + occupy_time + safe_gap;
+        let time_out = time_in + zone_time + occupy_time + safe_gap;
 
         let reservation = ZoneReservation {
             _car_id: car_id.to_string(),
