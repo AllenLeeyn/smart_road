@@ -82,15 +82,15 @@ impl<'b> Car<'b> {
             Direction::West  => self.x <= 550,
         }
     }
-    pub fn update(&mut self) {
+    pub fn update(&mut self, delta_time: Duration) {
         if self.exited {
             return;
         }
 
         match self.route {
-            Route::Right => self.update_right_turn(),
-            Route::Left => self.update_left_turn(),
-            _ => self.update_straight(),
+            Route::Right => self.update_right_turn(delta_time),
+            Route::Left => self.update_left_turn(delta_time),
+            _ => self.update_straight(delta_time),
         }
 
         match self.direction {
@@ -112,15 +112,9 @@ impl<'b> Car<'b> {
         if self.exited { self.time_exit = Some(SystemTime::now()); }
     }
 
-    fn update_straight(&mut self) {
+    fn update_straight(&mut self, delta_time: Duration) {
         let now = SystemTime::now();
-
-        if !self.in_intersection && now < self.entry_time {
-            if self.is_at_entry_boundary() {
-                // Stop here until allowed
-                return;
-            }
-        }
+        let seconds = delta_time.as_secs_f64();
 
         if !self.in_intersection && self.is_at_entry_boundary() {
             self.in_intersection = true;
@@ -153,51 +147,54 @@ impl<'b> Car<'b> {
             (Self::MAX_SPEED * 60) as f64
         };
 
-        let target_speed = (speed_px_per_sec / 60.0).round() as i32;
-        let max_acceleration = 1;
+        let target_speed = (speed_px_per_sec).round() as i32;
+        let max_acceleration = 30;
 
         if self.speed < target_speed {
-            self.speed = (self.speed + max_acceleration).min(target_speed).min(Self::MAX_SPEED);
+            self.speed = (self.speed + max_acceleration).min(target_speed).min(Self::MAX_SPEED * 60);
         } else if self.speed > target_speed {
             self.speed = (self.speed - max_acceleration).max(target_speed).max(0);
         }
 
-        if self.route == Route::Right { self.speed = 7 }
+        if self.route == Route::Right { self.speed = 5 * 60 }
+        let distance = (self.speed as f64 * seconds).round() as i32;
 
         match self.direction {
-            Direction::North => self.y -= self.speed,
-            Direction::South => self.y += self.speed,
-            Direction::East  => self.x += self.speed,
-            Direction::West  => self.x -= self.speed,
+            Direction::North => self.y -= distance,
+            Direction::South => self.y += distance,
+            Direction::East  => self.x += distance,
+            Direction::West  => self.x -= distance,
         }
     }
 
-    fn update_right_turn(&mut self) {
+    fn update_right_turn(&mut self, delta_time: Duration) {
+        let seconds = delta_time.as_secs_f64();
+        let distance = (self.speed as f64 * seconds).round() as i32;
         let distance_forward = self.distance_to_entry();
 
         if self.turned || distance_forward < 350 {
-            self.update_straight();
+            self.update_straight(delta_time);
         } else {
             match self.direction {
                 Direction::North => {
                     self.direction = Direction::East;
                     self.y = 558;
-                    self.x += self.speed;
+                    self.x += distance;
                 }
                 Direction::South => {
                     self.direction = Direction::West;
                     self.y = 308;
-                    self.x -= 40 -self.speed;
+                    self.x -= 40 - distance;
                 }
                 Direction::East => {
                     self.direction = Direction::South;
                     self.x = 308;
-                    self.y += self.speed;
+                    self.y += distance;
                 }
                 Direction::West => {
                     self.direction = Direction::North;
                     self.x = 558;
-                    self.y -= 40 - self.speed;
+                    self.y -= 40 - distance;
                 }
             }
             self.turned = true;
@@ -205,32 +202,34 @@ impl<'b> Car<'b> {
     }
 
     
-    fn update_left_turn(&mut self) {
+    fn update_left_turn(&mut self, delta_time: Duration) {
+        let seconds = delta_time.as_secs_f64();
+        let distance = (self.speed as f64 * seconds).round() as i32;
         let distance_forward = self.distance_to_entry();
 
         if self.turned || distance_forward < 500 {
-            self.update_straight();
+            self.update_straight(delta_time);
         } else {
             match self.direction {
                 Direction::North => {
                     self.direction = Direction::West;
                     self.y = 408;
-                    self.x -= 40 - self.speed;
+                    self.x -= 40 - distance;
                 }
                 Direction::South => {
                     self.direction = Direction::East;
                     self.y = 458;
-                    self.x += self.speed;
+                    self.x += distance;
                 }
                 Direction::East => {
                     self.direction = Direction::North;
                     self.x = 458;
-                    self.y -= 40 - self.speed;
+                    self.y -= 40 - distance;
                 }
                 Direction::West => {
                     self.direction = Direction::South;
                     self.x = 408;
-                    self.y += self.speed;
+                    self.y += distance;
                 }
             }
             self.turned = true;

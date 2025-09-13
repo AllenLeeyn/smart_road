@@ -6,7 +6,7 @@ use crate::crossing_manager::CrossingManager;
 use rand::prelude::IndexedRandom;
 use rand::rng;
 use sdl2::render::Texture;
-use std::time::Duration;
+use std::time::{SystemTime, Duration};
 use chrono::{DateTime, Local};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -31,6 +31,7 @@ pub struct Intersection<'a> {
     pub id_generator: CarIdGenerator,
     pub crossing_manager: CrossingManager,
     pub collision_count: usize,
+    pub last_update: SystemTime,
 }
 
 impl<'a> Intersection<'a> {
@@ -50,7 +51,8 @@ impl<'a> Intersection<'a> {
         Intersection {
             car_textures,
             cars_in, cars_out: Vec::new(),
-            id_generator, crossing_manager, collision_count: 0 }
+            id_generator, crossing_manager, collision_count: 0,
+            last_update: SystemTime::now() }
     }
 
     pub fn add_car_in_rnd(&mut self) {
@@ -121,6 +123,10 @@ impl<'a> Intersection<'a> {
     }
 
     pub fn update(&mut self) {
+        let now = SystemTime::now();
+        let delta = now.duration_since(self.last_update).unwrap_or(Duration::from_millis(16));
+        self.last_update = now;
+
         self.check_cars_collision();
         self.crossing_manager.update();
         for queue in self.cars_in.values_mut() {
@@ -134,7 +140,7 @@ impl<'a> Intersection<'a> {
                     continue;
                 }
 
-                car.update();
+                car.update(delta);
 
                 if car.exited {
                     let exited_car = queue.remove(i);
@@ -233,9 +239,11 @@ pub fn spawn_position(direction: Direction, route: Route) -> (i32, i32, i32) {
 }
 
 fn car_spawn_check(lane: &Vec<Car>, direction: Direction, x: i32, y: i32, height: i32) -> bool {
+    if lane.len() >= 4 { return false; }
+
     match lane.last() {
         Some(last_car) => {
-            let safe_distance = 50.max(last_car.speed * 15);
+            let safe_distance = height;
             let last_bb = last_car.bounding_box();
             match direction {
                 Direction::North =>
