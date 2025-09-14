@@ -1,4 +1,7 @@
 use crate::crossing_manager::ZoneIndex;
+use std::time::Duration;
+
+pub const BASE_DELTA_TIME: Duration = Duration::from_millis(16);
 
 pub const MAX_SPEED: i32 = 5;
 pub const BRAKE_DISTANCE_PX: i32 = 20;
@@ -11,12 +14,11 @@ pub const RIGHT_TURN_ENTRY_DISTANCE_PX: i32 = 350;
 
 pub const ZONE_LENGTH_PX: f64 = 50.0;
 pub const CAR_LENGTH_PX: f64 = 78.0;
-pub const SPEED_PX_PER_SEC: f64 = 300.0;
-pub const SAFE_DISTANCE_PX: f64 = 50.0 + (5.0 * 15.0);
+pub const SPEED_PX_PER_SEC: f64 = MAX_SPEED as f64 * 60.0;
+pub const SAFE_DISTANCE_PX: f64 = CAR_LENGTH_PX;
 
 pub const CAR_WIDTH_PX: u32 = 33;
 pub const CAR_HEIGHT_PX: u32 = 78;
-
 
 pub const SPAWN_POSITION_SOUTH_LEFT: (i32, i32, i32) = (408, -80, 5);
 pub const SPAWN_POSITION_SOUTH_STRAIGHT: (i32, i32, i32) = (358, -80, 5);
@@ -34,15 +36,14 @@ pub const SPAWN_POSITION_WEST_LEFT: (i32, i32, i32) = (900, 408, 5);
 pub const SPAWN_POSITION_WEST_STRAIGHT: (i32, i32, i32) = (900, 358, 5);
 pub const SPAWN_POSITION_WEST_RIGHT: (i32, i32, i32) = (900, 308, 7);
 
+pub const ZONES_FOR_SOUTH_LEFT: &[ZoneIndex] = &[(0, 1), (1, 1), (2, 1), (2, 2), (2, 3)];
+pub const ZONES_FOR_SOUTH_STRAIGHT: &[ZoneIndex] = &[(0, 0), (1, 0), (2, 0), (3, 0)];
 
-pub const ZONES_FOR_SOUTH_LEFT: &[ZoneIndex] = &[(0,1), (1,1), (2,1), (2,2), (2,3)];
-pub const ZONES_FOR_SOUTH_STRAIGHT: &[ZoneIndex] = &[(0,0), (1,0), (2,0), (3,0)];
+pub const ZONES_FOR_NORTH_LEFT: &[ZoneIndex] = &[(3, 2), (2, 2), (1, 2), (1, 1), (1, 0)];
+pub const ZONES_FOR_NORTH_STRAIGHT: &[ZoneIndex] = &[(3, 3), (2, 3), (1, 3), (0, 3)];
 
-pub const ZONES_FOR_NORTH_LEFT: &[ZoneIndex] = &[(3,2), (2,2), (1,2), (1,1), (1,0)];
-pub const ZONES_FOR_NORTH_STRAIGHT: &[ZoneIndex] = &[(3,3), (2,3), (1,3), (0,3)];
+pub const ZONES_FOR_EAST_LEFT: &[ZoneIndex] = &[(2, 0), (2, 1), (2, 2), (1, 2), (0, 2)];
+pub const ZONES_FOR_EAST_STRAIGHT: &[ZoneIndex] = &[(3, 0), (3, 1), (3, 2), (3, 3)];
 
-pub const ZONES_FOR_EAST_LEFT: &[ZoneIndex] = &[(2,0), (2,1), (2,2), (1,2), (0,2)];
-pub const ZONES_FOR_EAST_STRAIGHT: &[ZoneIndex] = &[(3,0), (3,1), (3,2), (3,3)];
-
-pub const ZONES_FOR_WEST_LEFT: &[ZoneIndex] = &[(1,3), (1,2), (1,1), (2,1), (3,1)];
-pub const ZONES_FOR_WEST_STRAIGHT: &[ZoneIndex] = &[(0,3), (0,2), (0,1), (0,0)];
+pub const ZONES_FOR_WEST_LEFT: &[ZoneIndex] = &[(1, 3), (1, 2), (1, 1), (2, 1), (3, 1)];
+pub const ZONES_FOR_WEST_STRAIGHT: &[ZoneIndex] = &[(0, 3), (0, 2), (0, 1), (0, 0)];

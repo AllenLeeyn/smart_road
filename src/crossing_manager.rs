@@ -7,17 +7,18 @@ use sdl2::render::Canvas;
 use sdl2::video::Window;
 use crate::consts::*;
 
-pub type ZoneIndex = (usize, usize); // e.g., (2, 1)
+pub type ZoneIndex = (usize, usize);
 
 #[derive(Clone)]
 pub struct ZoneReservation {
-    pub _car_id: String,                   // Unique ID
+    pub _car_id: String,
     pub time_in: SystemTime,
     pub time_out: SystemTime,
 }
 
 pub struct CrossingManager {
     pub grid: HashMap<ZoneIndex, Vec<ZoneReservation>>,
+    pub last_update: SystemTime,
 }
 
 impl CrossingManager {
@@ -29,17 +30,34 @@ impl CrossingManager {
                 grid.insert((x, y), Vec::new());
             }
         }
-        CrossingManager { grid }
+        CrossingManager { grid, last_update: SystemTime::now() }
     }
 
-    pub fn latest_available_time(&self, dir: Direction, route: Route, distance_to_entry: f64) -> SystemTime {
+    pub fn latest_available_time(
+        &self,
+        dir: Direction,
+        route: Route,
+        distance_to_entry: f64,
+        time_scale: f64,
+    ) -> SystemTime {
         let path = route_to_zone_path(dir, route);
         let now = SystemTime::now();
 
-        let zone_time = Duration::from_secs_f64(ZONE_LENGTH_PX / SPEED_PX_PER_SEC);
-        let car_occupy_time = Duration::from_secs_f64(CAR_LENGTH_PX / SPEED_PX_PER_SEC);
-        let safe_time_gap = Duration::from_secs_f64(SAFE_DISTANCE_PX / SPEED_PX_PER_SEC);
-        let travel_time = Duration::from_secs_f64(distance_to_entry / SPEED_PX_PER_SEC);
+        let zone_time = Duration::from_millis((ZONE_LENGTH_PX / SPEED_PX_PER_SEC * 1000.0 * time_scale) as u64);
+        let car_occupy_time = Duration::from_millis((CAR_LENGTH_PX / SPEED_PX_PER_SEC * 1000.0 * time_scale) as u64);
+        let safe_time_gap = Duration::from_millis((SAFE_DISTANCE_PX / SPEED_PX_PER_SEC * 1000.0 * time_scale) as u64);
+        let travel_time = Duration::from_millis((distance_to_entry / SPEED_PX_PER_SEC * 1000.0 * time_scale) as u64);
+
+        println!("--------------------------------");
+        println!("latest_available_time:");
+        println!("dir: {:?}, route: {:?}", dir, route);
+        println!("path: {:?}", path);
+        println!("zone_time: {:?}, occupy_time: {:?}, safe_gap: {:?}, travel_time: {:?}", zone_time, car_occupy_time, safe_time_gap, travel_time);
+        println!("delta_time: {:?}", BASE_DELTA_TIME);
+        println!("last_update: {:?}", self.last_update);
+        println!("now: {:?}", now);
+        println!("time_scale: {:?}", time_scale);
+        println!("--------------------------------");
 
         let mut base_time = now + travel_time;
 
@@ -47,6 +65,7 @@ impl CrossingManager {
         let base_time = 'try_time: loop {
             for (i, zone) in path.iter().enumerate() {
                 let zone_entry_time = base_time + zone_time * i as u32;
+                // removed + zone_time
                 let zone_exit_time = zone_entry_time + car_occupy_time + safe_time_gap;
 
                 if let Some(res_list) = self.grid.get(zone) {
@@ -65,10 +84,17 @@ impl CrossingManager {
         base_time
     }
 
-    pub fn reserve_path(&mut self, car_id: &str, dir: Direction, route: Route, distance_to_entry: f64) -> SystemTime {
-        let entry_time = self.latest_available_time(dir, route, distance_to_entry);
+    pub fn reserve_path(
+        &mut self,
+        car_id: &str,
+        dir: Direction,
+        route: Route,
+        distance_to_entry: f64,
+        time_scale: f64,
+    ) -> SystemTime {
+        let entry_time = self.latest_available_time(dir, route, distance_to_entry, time_scale);
         let path = route_to_zone_path(dir, route);
-        let reservations = generate_zone_reservations(car_id, &path, entry_time);
+        let reservations = generate_zone_reservations(car_id, &path, entry_time, self.last_update, time_scale);
 
         for (zone, reservation) in reservations {
             if let Some(zone_res_list) = self.grid.get_mut(&zone) {
@@ -78,9 +104,11 @@ impl CrossingManager {
 
         entry_time
     }
-    
+
     pub fn update(&mut self) {
         let now = SystemTime::now();
+
+        self.last_update = now;
 
         for res_list in self.grid.values_mut() {
             res_list.retain(|res| res.time_out > now);
@@ -123,9 +151,9 @@ impl CrossingManager {
                 let color = if has_active {
                     Color::RGB(160, 32, 240) // Purple (active)
                 } else if has_any {
-                    Color::RED    // Red (reserved, but inactive)
+                    Color::RED // Red (reserved, but inactive)
                 } else {
-                    Color::GREEN    // Green (free)
+                    Color::GREEN // Green (free)
                 };
 
                 canvas.set_draw_color(color);
@@ -145,7 +173,7 @@ fn route_to_zone_path(dir: Direction, route: Route) -> Vec<ZoneIndex> {
         (Direction::North, Route::Left) => ZONES_FOR_NORTH_LEFT.to_vec(),
         (Direction::North, Route::Straight) => ZONES_FOR_NORTH_STRAIGHT.to_vec(),
 
-        (Direction::East, Route::Left)  => ZONES_FOR_EAST_LEFT.to_vec(),
+        (Direction::East, Route::Left) => ZONES_FOR_EAST_LEFT.to_vec(),
         (Direction::East, Route::Straight) => ZONES_FOR_EAST_STRAIGHT.to_vec(),
 
         (Direction::West, Route::Left) => ZONES_FOR_WEST_LEFT.to_vec(),
@@ -159,10 +187,23 @@ pub fn generate_zone_reservations(
     car_id: &str,
     path: &[ZoneIndex],
     entry_time: SystemTime,
+    last_update: SystemTime,
+    time_scale: f64,
 ) -> Vec<(ZoneIndex, ZoneReservation)> {
-    let zone_time = Duration::from_secs_f64(ZONE_LENGTH_PX / SPEED_PX_PER_SEC);
-    let occupy_time = Duration::from_secs_f64(CAR_LENGTH_PX / SPEED_PX_PER_SEC);
-    let safe_gap = Duration::from_secs_f64(SAFE_DISTANCE_PX / SPEED_PX_PER_SEC);
+    let zone_time = Duration::from_secs_f64(ZONE_LENGTH_PX / SPEED_PX_PER_SEC * time_scale);
+    let occupy_time = Duration::from_secs_f64(CAR_LENGTH_PX / SPEED_PX_PER_SEC * time_scale);
+    let safe_gap = Duration::from_secs_f64(SAFE_DISTANCE_PX / SPEED_PX_PER_SEC * time_scale);
+
+    println!("--------------------------------");
+    println!("generate_zone_reservations:");
+    println!("car_id: {:?}", car_id);
+    println!("path: {:?}", path);
+    println!("zone_time: {:?}, occupy_time: {:?}, safe_gap: {:?}", zone_time, occupy_time, safe_gap);
+    println!("entry_time: {:?}", entry_time);
+    println!("delta_time: {:?}", BASE_DELTA_TIME);
+    println!("last_update: {:?}", last_update);
+    println!("time_scale: {:?}", time_scale);
+    println!("--------------------------------");
 
     let mut reservations = Vec::new();
 

@@ -8,7 +8,7 @@ use chrono::{DateTime, Local};
 use rand::prelude::IndexedRandom;
 use rand::rng;
 use sdl2::render::Texture;
-use std::time::Duration;
+use std::time::{SystemTime, Duration};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
@@ -26,15 +26,18 @@ pub enum Route {
 }
 
 pub struct Intersection<'a> {
+    pub car_textures: HashMap<Route, &'a Texture<'a>>,
     pub cars_in: HashMap<(Direction, Route), Vec<Car<'a>>>,
     pub cars_out: Vec<Car<'a>>,
     pub id_generator: CarIdGenerator,
     pub crossing_manager: CrossingManager,
     pub collision_count: usize,
+    pub near_miss: usize,
+    pub last_update: SystemTime,
 }
 
 impl<'a> Intersection<'a> {
-    pub fn new() -> Self {
+    pub fn new(car_textures: HashMap<Route, &'a Texture<'a>>) -> Self {
         use Direction::*;
         use Route::*;
 
@@ -48,20 +51,23 @@ impl<'a> Intersection<'a> {
             }
         }
         Intersection {
+            car_textures,
             cars_in,
             cars_out: Vec::new(),
             id_generator,
             crossing_manager,
             collision_count: 0,
+            near_miss: 0,
+            last_update: SystemTime::now(),
         }
     }
 
-    pub fn add_car_in_rnd(&mut self, texture: &'a Texture<'a>, no_print: bool) {
+    pub fn add_car_in_rnd(&mut self, no_print: bool) {
         let direction = get_rnd_direction();
-        self.add_car_in(direction, &texture, no_print);
+        self.add_car_in(direction, no_print);
     }
 
-    pub fn add_car_in(&mut self, direction: Direction, texture: &'a Texture<'a>, no_print: bool) {
+    pub fn add_car_in(&mut self, direction: Direction, no_print: bool) {
         for route in get_rnd_routes() {
             let (x, y, speed) = spawn_position(direction, route);
             let lane = self.cars_in.get(&(direction, route)).unwrap();
@@ -69,14 +75,20 @@ impl<'a> Intersection<'a> {
 
             if can_spawn {
                 let car_id = self.id_generator.get_next(direction, route);
-                let distance_to_entry = if route == Route::Right { ENTRY_DISTANCE_PX_RIGHT as f64 } else { ENTRY_DISTANCE_PX as f64 };
-                let entry_time = self.crossing_manager.latest_available_time(
-                    direction,
-                    route,
-                    distance_to_entry,
-                );
-                self.crossing_manager
-                    .reserve_path(&car_id, direction, route, distance_to_entry);
+                let distance_to_entry = if route == Route::Right {
+                    ENTRY_DISTANCE_PX_RIGHT as f64
+                } else {
+                    ENTRY_DISTANCE_PX as f64
+                };
+                let elapsed = SystemTime::now().duration_since(self.last_update).unwrap_or(Duration::from_millis(1));
+                let time_scale = (elapsed.as_millis() as f64 / BASE_DELTA_TIME.as_millis() as f64).max(0.0625);
+                let entry_time = self.crossing_manager
+                    .reserve_path(&car_id, direction, route, distance_to_entry, time_scale);
+
+                let texture = self
+                    .car_textures
+                    .get(&route)
+                    .expect("Missing texture for route");
 
                 let car = Car::new(
                     car_id.clone(),
@@ -91,26 +103,27 @@ impl<'a> Intersection<'a> {
                     direction,
                 );
 
+                self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
+
                 let datetime: DateTime<Local> = entry_time.into();
                 if !no_print {
                     println!(
-                    "✅ Spawned car {} heading {:?} going {:?} | Entry time: {}",
-                    car_id,
-                    direction,
-                    route,
-                    datetime.format("%H:%M:%S%.3f")
+                        "✅ Spawned car {} heading {:?} going {:?} | Entry time: {}",
+                        car_id,
+                        direction,
+                        route,
+                        datetime.format("%H:%M:%S%.3f")
                     );
                 }
-                self.cars_in.get_mut(&(direction, route)).unwrap().push(car);
-                return; // Successfully spawned, exit function
+                return;
             }
         }
 
-        // If reached here, no lane available
+        // All routes attempted, no lane available
         if !no_print {
             println!(
-            "🚫 No free lane found for spawning car in direction {:?}",
-            direction
+                "🚫 No free lane found for spawning car in direction {:?}",
+                direction
             );
         }
     }
@@ -143,19 +156,16 @@ impl<'a> Intersection<'a> {
     }
 
     pub fn update(&mut self) {
+        let now = SystemTime::now();
+        self.last_update = now;
+
         self.check_cars_collision();
         self.crossing_manager.update();
         for queue in self.cars_in.values_mut() {
             let mut i = 0;
 
-            // Collect car IDs before the loop to avoid borrow checker issues
-            // let car_ids: Vec<_> = queue.iter().map(|c| &c.id).collect();
-            // println!("Cars in queue: {:?}", car_ids);
-
             while i < queue.len() {
-                // Check if there's a front car and if current car should brake
                 let should_brake = if i > 0 {
-                    // Get immutable reference to front car first
                     let front_car = &queue[i - 1];
                     let current_car = &queue[i];
                     !current_car.collided && current_car.is_too_close(front_car)
@@ -171,6 +181,10 @@ impl<'a> Intersection<'a> {
                     continue;
                 }
 
+                if !car.brake && should_brake {
+                    self.near_miss += 1
+                }
+                // if should_brake { println!("Car {} should brake", car.id); }
                 car.brake = should_brake;
                 car.update();
 
@@ -193,7 +207,7 @@ impl<'a> Intersection<'a> {
         let _ = self.crossing_manager.draw(canvas);
     }
 
-    pub fn get_statistics(&self) -> String {
+    pub fn get_statistics(&self, is_test: bool) -> String {
         let cars = &self.cars_out;
 
         let total = cars.len();
@@ -231,22 +245,37 @@ impl<'a> Intersection<'a> {
             }
         }
 
-        format!(
-            "Intersection Statistics\n\
-             -----------------------------\n\
-             Vehicles Crossed: {}\n\
-             Collisions: {}\n\
-             Max Speed: {} px/s\n\
-             Min Speed: {} px/s\n\
-             Max Time in Intersection: {} s\n\
-             Min Time in Intersection: {} s",
-            total,
-            self.collision_count,
-            round_two(max_speed),
-            round_two(min_speed),
-            round_two(max_duration.as_secs_f32()),
-            round_two(min_duration.as_secs_f32())
-        )
+        if !is_test {
+            return format!(
+                "Intersection Statistics\n\
+                 -----------------------------\n\
+                 Vehicles Crossed: {}\n\
+                 Collisions: {}\n\
+                 Near misses: {}\n\
+                 Max Speed: {} px/s\n\
+                 Min Speed: {} px/s\n\
+                 Max Time in Intersection: {} s\n\
+                 Min Time in Intersection: {} s",
+                total,
+                self.collision_count,
+                self.near_miss,
+                round_two(max_speed),
+                round_two(min_speed),
+                round_two(max_duration.as_secs_f32()),
+                round_two(min_duration.as_secs_f32())
+            );
+        } else {
+            return format!(
+                "Test Statistics\n\
+                 -----------------------------\n\
+                 Vehicles Crossed: {}\n\
+                 Collisions: {}\n\
+                 Near misses: {}\n",
+                total,
+                self.collision_count,
+                self.near_miss,
+            )
+        }
     }
 }
 
@@ -271,9 +300,11 @@ pub fn spawn_position(direction: Direction, route: Route) -> (i32, i32, i32) {
 }
 
 fn car_spawn_check(lane: &Vec<Car>, direction: Direction, x: i32, y: i32, height: i32) -> bool {
+    if lane.len() >= 4 { return false; }
+
     match lane.last() {
         Some(last_car) => {
-            let safe_distance = 50.max(last_car.speed * 15);
+            let safe_distance = height;
             let last_bb = last_car.bounding_box();
             match direction {
                 Direction::North => y >= last_bb.y() + last_bb.height() as i32 + safe_distance,

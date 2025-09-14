@@ -1,5 +1,5 @@
-use crate::intersection::{Direction, Route};
 use crate::consts::*;
+use crate::intersection::{Direction, Route};
 use chrono::{DateTime, Local};
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -7,14 +7,14 @@ use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 use std::time::{Duration, SystemTime};
 
-pub struct Car<'b> {
+pub struct Car<'a> {
     pub id: String,
     pub x: i32,
     pub y: i32,
     pub width: u32,
     pub height: u32,
     pub speed: i32,
-    pub texture: &'b Texture<'b>,
+    pub texture: &'a Texture<'a>,
     pub route: Route,
     pub direction: Direction,
     pub turned: bool,
@@ -31,9 +31,6 @@ pub struct Car<'b> {
 }
 
 impl<'a> Car<'a> {
-    const MAX_SPEED: i32 = MAX_SPEED;
-    const ENTRY_DISTANCE_PX: i32 = ENTRY_DISTANCE_PX;
-
     pub fn new(
         id: String,
         x: i32,
@@ -89,43 +86,43 @@ impl<'a> Car<'a> {
     }
 
     pub fn is_too_close(&self, other: &Car) -> bool {
-    let safe_distance = (self.speed).max(BRAKE_DISTANCE_PX);
+        // Changed from self.speed to self.speed/60 for testing purposes
+        let safe_distance = (self.speed / 60).max(BRAKE_DISTANCE_PX);
 
-    let self_box = self.bounding_box();
-    let other_box = other.bounding_box();
+        let self_box = self.bounding_box();
+        let other_box = other.bounding_box();
 
-    match self.direction {
-        Direction::North => {
-            let this_front = self_box.top();            // my top edge
-            let other_rear = other_box.bottom();        // other bottom edge
-            this_front <= other_rear + safe_distance
-                && self_box.x() < other_box.right()     // horizontal overlap
-                && self_box.right() > other_box.x()
-        }
-        Direction::South => {
-            let this_front = self_box.bottom();         // my bottom edge
-            let other_rear = other_box.top();           // other top edge
-            this_front >= other_rear - safe_distance
-                && self_box.x() < other_box.right()
-                && self_box.right() > other_box.x()
-        }
-        Direction::East => {
-            let this_front = self_box.right();          // my right edge
-            let other_rear = other_box.x();             // other left edge
-            this_front >= other_rear - safe_distance
-                && self_box.y() < other_box.bottom()    // vertical overlap
-                && self_box.bottom() > other_box.y()
-        }
-        Direction::West => {
-            let this_front = self_box.x();              // my left edge
-            let other_rear = other_box.right();         // other right edge
-            this_front <= other_rear + safe_distance
-                && self_box.y() < other_box.bottom()
-                && self_box.bottom() > other_box.y()
+        match self.direction {
+            Direction::North => {
+                let this_front = self_box.top(); // my top edge
+                let other_rear = other_box.bottom(); // other bottom edge
+                this_front <= other_rear + safe_distance
+                    && self_box.x() < other_box.right()     // horizontal overlap
+                    && self_box.right() > other_box.x()
+            }
+            Direction::South => {
+                let this_front = self_box.bottom(); // my bottom edge
+                let other_rear = other_box.top(); // other top edge
+                this_front >= other_rear - safe_distance
+                    && self_box.x() < other_box.right()
+                    && self_box.right() > other_box.x()
+            }
+            Direction::East => {
+                let this_front = self_box.right(); // my right edge
+                let other_rear = other_box.x(); // other left edge
+                this_front >= other_rear - safe_distance
+                    && self_box.y() < other_box.bottom()    // vertical overlap
+                    && self_box.bottom() > other_box.y()
+            }
+            Direction::West => {
+                let this_front = self_box.x(); // my left edge
+                let other_rear = other_box.right(); // other right edge
+                this_front <= other_rear + safe_distance
+                    && self_box.y() < other_box.bottom()
+                    && self_box.bottom() > other_box.y()
+            }
         }
     }
-}
-
 
     pub fn distance_to_entry(&self) -> i32 {
         match self.direction {
@@ -137,12 +134,12 @@ impl<'a> Car<'a> {
     }
 
     fn is_at_entry_boundary(&self) -> bool {
-        let entry_distance = if self.route == Route::Right { 
-            crate::consts::ENTRY_DISTANCE_PX_RIGHT 
-        } else { 
-            crate::consts::ENTRY_DISTANCE_PX 
+        let entry_distance = if self.route == Route::Right {
+            crate::consts::ENTRY_DISTANCE_PX_RIGHT
+        } else {
+            crate::consts::ENTRY_DISTANCE_PX
         };
-        
+
         match self.direction {
             Direction::North => self.y <= 900 - entry_distance,
             Direction::South => self.y + self.height as i32 >= entry_distance,
@@ -184,13 +181,7 @@ impl<'a> Car<'a> {
 
     fn update_straight(&mut self) {
         let now = SystemTime::now();
-
-        if !self.in_intersection && now < self.entry_time {
-            if self.is_at_entry_boundary() {
-                // Stop here until allowed
-                return;
-            }
-        }
+        let seconds = BASE_DELTA_TIME.as_secs_f64();
 
         if !self.in_intersection && self.is_at_entry_boundary() {
             self.in_intersection = true;
@@ -213,7 +204,7 @@ impl<'a> Car<'a> {
             );
         }
 
-        let distance_to_entry = (Self::ENTRY_DISTANCE_PX - self.distance_to_entry()).max(0);
+        let distance_to_entry = (ENTRY_DISTANCE_PX - self.distance_to_entry()).max(0);
         let time_left = self
             .entry_time
             .duration_since(now)
@@ -223,58 +214,61 @@ impl<'a> Car<'a> {
         let speed_px_per_sec = if time_left > 0.0 {
             distance_to_entry as f64 / time_left
         } else {
-            (Self::MAX_SPEED * 60) as f64
+            MAX_SPEED as f64 * 60.0
         };
 
-        let target_speed = (speed_px_per_sec / 60.0).round() as i32;
-        let max_acceleration = 1;
-
-        if self.speed < target_speed {
-            self.speed = (self.speed + max_acceleration)
-                .min(target_speed)
-                .min(Self::MAX_SPEED);
-        } else if self.speed > target_speed {
-            self.speed = (self.speed - max_acceleration).max(target_speed).max(0);
-        }
+        let target_speed = (speed_px_per_sec).round() as i32;
+        let max_acceleration = 30;
 
         if self.route == Route::Right {
-            self.speed = RIGHT_TURN_SPEED_PX;
+            self.speed = MAX_SPEED * 60;
+        } else {
+            if self.speed < target_speed {
+                self.speed = (self.speed + max_acceleration)
+                    .min(target_speed)
+                    .min(MAX_SPEED * 60);
+            } else if self.speed > target_speed {
+                self.speed = (self.speed - max_acceleration).max(target_speed).max(0);
+            }
         }
+        let distance = (self.speed as f64 * seconds).round() as i32;
 
         match self.direction {
-            Direction::North => self.y -= self.speed,
-            Direction::South => self.y += self.speed,
-            Direction::East => self.x += self.speed,
-            Direction::West => self.x -= self.speed,
+            Direction::North => self.y -= distance,
+            Direction::South => self.y += distance,
+            Direction::East => self.x += distance,
+            Direction::West => self.x -= distance,
         }
     }
 
     fn update_right_turn(&mut self) {
+        let seconds = BASE_DELTA_TIME.as_secs_f64();
+        let distance = (self.speed as f64 * seconds).round() as i32;
         let distance_forward = self.distance_to_entry();
 
-        if self.turned || distance_forward < RIGHT_TURN_ENTRY_DISTANCE_PX {
+        if self.turned || distance_forward < ENTRY_DISTANCE_PX {
             self.update_straight();
         } else {
             match self.direction {
                 Direction::North => {
                     self.direction = Direction::East;
                     self.y = 558;
-                    self.x += self.speed;
+                    self.x += distance;
                 }
                 Direction::South => {
                     self.direction = Direction::West;
                     self.y = 308;
-                    self.x -= 40 - self.speed;
+                    self.x -= 40 - distance;
                 }
                 Direction::East => {
                     self.direction = Direction::South;
                     self.x = 308;
-                    self.y += self.speed;
+                    self.y += distance;
                 }
                 Direction::West => {
                     self.direction = Direction::North;
                     self.x = 558;
-                    self.y -= 40 - self.speed;
+                    self.y -= 40 - distance;
                 }
             }
             self.turned = true;
@@ -282,6 +276,8 @@ impl<'a> Car<'a> {
     }
 
     fn update_left_turn(&mut self) {
+        let seconds = BASE_DELTA_TIME.as_secs_f64();
+        let distance = (self.speed as f64 * seconds).round() as i32;
         let distance_forward = self.distance_to_entry();
 
         if self.turned || distance_forward < LEFT_TURN_ENTRY_DISTANCE_PX {
@@ -291,22 +287,22 @@ impl<'a> Car<'a> {
                 Direction::North => {
                     self.direction = Direction::West;
                     self.y = 408;
-                    self.x -= 40 - self.speed;
+                    self.x -= 40 - distance;
                 }
                 Direction::South => {
                     self.direction = Direction::East;
                     self.y = 458;
-                    self.x += self.speed;
+                    self.x += distance;
                 }
                 Direction::East => {
                     self.direction = Direction::North;
                     self.x = 458;
-                    self.y -= 40 - self.speed;
+                    self.y -= 40 - distance;
                 }
                 Direction::West => {
                     self.direction = Direction::South;
                     self.x = 408;
-                    self.y += self.speed;
+                    self.y += distance;
                 }
             }
             self.turned = true;
@@ -335,7 +331,9 @@ impl<'a> Car<'a> {
             .copy_ex(&self.texture, None, dest, angle, None, false, false)
             .unwrap();
 
-        if !self.in_intersection {
+        if self.brake {
+            canvas.set_draw_color(Color::RED); // Red for braking
+        } else if !self.in_intersection {
             canvas.set_draw_color(Color::YELLOW); // Yellow for waiting
         } else {
             canvas.set_draw_color(Color::BLUE); // Blue for active
