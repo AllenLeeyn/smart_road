@@ -1,13 +1,12 @@
 use crate::car::Car;
 use crate::cars_id::CarIdGenerator;
 use crate::crossing_manager::CrossingManager;
+use crate::utils::*;
 use std::collections::HashMap;
 
 use chrono::{DateTime, Local};
-use rand::prelude::IndexedRandom;
-use rand::rng;
 use sdl2::render::Texture;
-use std::time::{SystemTime, Duration};
+use std::time::{SystemTime};
 
 use crate::consts::*;
 
@@ -66,7 +65,7 @@ impl<'a> Intersection<'a> {
     pub fn add_car_in(&mut self, direction: Direction) {
 
         for route in get_rnd_routes() {
-            let (x, y, speed) = spawn_position(direction, route);
+            let (x, y, speed) = get_spawn_position(direction, route);
             let lane = self.cars_in.get(&(direction, route)).unwrap();
             let can_spawn = car_spawn_check(lane, direction, x, y, CAR_HEIGHT_PX as i32);
 
@@ -204,38 +203,8 @@ impl<'a> Intersection<'a> {
             return "No vehicles have crossed the intersection yet.".to_string();
         }
 
-        let mut min_speed = f32::MAX;
-        let mut max_speed = f32::MIN;
-        let mut total_speed = 0.0;
-
-        let mut min_duration = Duration::MAX;
-        let mut max_duration = Duration::ZERO;
-        let mut total_duration = Duration::ZERO;
-
-        for car in cars {
-            if let Some(exit_time) = car.time_exit {
-                if let Ok(duration) = exit_time.duration_since(car.time_enter) {
-                    let duration_secs = duration.as_secs_f32();
-
-                    if duration_secs > 0.0 {
-                        let distance = car.dist as f32;
-                        let effective_speed = distance / duration_secs;
-
-                        min_speed = min_speed.min(effective_speed);
-                        max_speed = max_speed.max(effective_speed);
-                        total_speed += effective_speed;
-                    }
-
-                    min_duration = min_duration.min(duration);
-                    max_duration = max_duration.max(duration);
-                    total_duration += duration;
-                }
-            }
-        }
-
-        let avg_speed = total_speed / total as f32;
-
-        let avg_duration_secs = total_duration.as_secs_f32() / total as f32;
+        let (min_speed, max_speed, avg_speed) = calculate_speed_statistics(cars);
+        let (min_duration, max_duration, avg_duration) = calculate_duration_statistics(cars);
 
         format!(
             "Intersection Statistics\n\
@@ -254,73 +223,12 @@ impl<'a> Intersection<'a> {
             total,
             self.collision_count,
             self.near_miss,
-            round_two(max_speed),
-            round_two(min_speed),
-            round_two(avg_speed),
-            round_two(max_duration.as_secs_f32()),
-            round_two(min_duration.as_secs_f32()),
-            round_two(avg_duration_secs)
+            max_speed,
+            min_speed,
+            avg_speed,
+            max_duration,
+            min_duration,
+            avg_duration
         )
     }
-}
-
-pub fn spawn_position(direction: Direction, route: Route) -> (i32, i32, i32) {
-    match (direction, route) {
-        (Direction::South, Route::Left) => SPAWN_POSITION_SOUTH_LEFT,
-        (Direction::South, Route::Straight) => SPAWN_POSITION_SOUTH_STRAIGHT,
-        (Direction::South, Route::Right) => SPAWN_POSITION_SOUTH_RIGHT,
-
-        (Direction::North, Route::Left) => SPAWN_POSITION_NORTH_LEFT,
-        (Direction::North, Route::Straight) => SPAWN_POSITION_NORTH_STRAIGHT,
-        (Direction::North, Route::Right) => SPAWN_POSITION_NORTH_RIGHT,
-
-        (Direction::East, Route::Left) => SPAWN_POSITION_EAST_LEFT,
-        (Direction::East, Route::Straight) => SPAWN_POSITION_EAST_STRAIGHT,
-        (Direction::East, Route::Right) => SPAWN_POSITION_EAST_RIGHT,
-
-        (Direction::West, Route::Left) => SPAWN_POSITION_WEST_LEFT,
-        (Direction::West, Route::Straight) => SPAWN_POSITION_WEST_STRAIGHT,
-        (Direction::West, Route::Right) => SPAWN_POSITION_WEST_RIGHT,
-    }
-}
-
-fn car_spawn_check(lane: &Vec<Car>, direction: Direction, x: i32, y: i32, height: i32) -> bool {
-    if lane.len() >= 4 { return false; }
-
-    match lane.last() {
-        Some(last_car) => {
-            let safe_distance = height;
-            let last_bb = last_car.bounding_box();
-            match direction {
-                Direction::North => y >= last_bb.y() + last_bb.height() as i32 + safe_distance,
-                Direction::South => y + height + safe_distance <= last_bb.y(),
-                Direction::East => x + height + safe_distance <= last_bb.x(),
-                Direction::West => x >= last_bb.x() + last_bb.width() as i32 + safe_distance,
-            }
-        }
-        None => true,
-    }
-}
-
-fn round_two(n: f32) -> f32 {
-    (n * 100.0).round() / 100.0
-}
-
-use rand::prelude::SliceRandom;
-pub fn get_rnd_routes() -> Vec<Route> {
-    let mut routes = vec![Route::Left, Route::Right, Route::Straight];
-    let mut rng = rng();
-    routes.shuffle(&mut rng);
-    routes
-}
-
-pub fn get_rnd_direction() -> Direction {
-    let directions = [
-        Direction::North,
-        Direction::South,
-        Direction::East,
-        Direction::West,
-    ];
-    let mut rng = rng();
-    *directions.choose(&mut rng).unwrap()
 }

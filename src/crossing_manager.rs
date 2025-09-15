@@ -1,4 +1,6 @@
 use crate::intersection::{Direction, Route};
+use crate::utils::route_to_zone_path;
+use crate::utils::generate_zone_reservations;
 use std::collections::HashMap;
 use std::time::{SystemTime, Duration};
 use sdl2::pixels::Color;
@@ -136,49 +138,4 @@ impl CrossingManager {
 
         Ok(())
     }
-}
-
-fn route_to_zone_path(dir: Direction, route: Route) -> Vec<ZoneIndex> {
-    match (dir, route) {
-        (Direction::South, Route::Left) => ZONES_FOR_SOUTH_LEFT.to_vec(),
-        (Direction::South, Route::Straight) => ZONES_FOR_SOUTH_STRAIGHT.to_vec(),
-
-        (Direction::North, Route::Left) => ZONES_FOR_NORTH_LEFT.to_vec(),
-        (Direction::North, Route::Straight) => ZONES_FOR_NORTH_STRAIGHT.to_vec(),
-
-        (Direction::East, Route::Left)  => ZONES_FOR_EAST_LEFT.to_vec(),
-        (Direction::East, Route::Straight) => ZONES_FOR_EAST_STRAIGHT.to_vec(),
-
-        (Direction::West, Route::Left) => ZONES_FOR_WEST_LEFT.to_vec(),
-        (Direction::West, Route::Straight) => ZONES_FOR_WEST_STRAIGHT.to_vec(),
-
-        (_, Route::Right) => vec![],
-    }
-}
-
-pub fn generate_zone_reservations(
-    car_id: &str,
-    path: &[ZoneIndex],
-    entry_time: SystemTime,
-) -> Vec<(ZoneIndex, ZoneReservation)> {
-    let zone_time = Duration::from_secs_f64(ZONE_LENGTH_PX / SPEED_PX_PER_SEC);
-    let occupy_time = Duration::from_secs_f64(CAR_HEIGHT_PX as f64 / SPEED_PX_PER_SEC);
-    let safe_gap = Duration::from_secs_f64(SAFE_DISTANCE_PX / SPEED_PX_PER_SEC);
-
-    let mut reservations = Vec::new();
-
-    for (i, &zone) in path.iter().enumerate() {
-        let time_in = entry_time + zone_time * i as u32;
-        let time_out = time_in + zone_time + occupy_time + safe_gap;
-
-        let reservation = ZoneReservation {
-            _car_id: car_id.to_string(),
-            time_in,
-            time_out,
-        };
-
-        reservations.push((zone, reservation));
-    }
-
-    reservations
 }

@@ -3,8 +3,9 @@ mod cars_id;
 mod consts;
 mod intersection;
 mod crossing_manager;
-use intersection::{Intersection, Direction, Route};
+mod utils;
 
+use intersection::{Intersection, Direction, Route};
 use sdl2::image::{InitFlag, LoadTexture};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -12,6 +13,7 @@ use sdl2::render::Texture;
 use std::collections::HashMap;
 
 use crate::consts::*;
+use crate::utils::present_main_canvas;
 
 
 pub fn main() {
@@ -84,10 +86,7 @@ pub fn main() {
 
         intersection.update();
 
-        canvas.clear();
-        canvas.copy(&bg_texture, None, None).unwrap();
-        intersection.draw(&mut canvas);
-        canvas.present();
+        present_main_canvas(&mut canvas, &bg_texture, &intersection);
 
         let elapsed = frame_start.elapsed();
         if elapsed < target_frame_duration {
