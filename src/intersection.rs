@@ -9,6 +9,8 @@ use rand::rng;
 use sdl2::render::Texture;
 use std::time::{SystemTime, Duration};
 
+use crate::consts::*;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
     North,
@@ -66,11 +68,11 @@ impl<'a> Intersection<'a> {
         for route in get_rnd_routes() {
             let (x, y, speed) = spawn_position(direction, route);
             let lane = self.cars_in.get(&(direction, route)).unwrap();
-            let can_spawn = car_spawn_check(lane, direction, x, y, 78);
+            let can_spawn = car_spawn_check(lane, direction, x, y, CAR_HEIGHT_PX as i32);
 
             if can_spawn {
                 let car_id = self.id_generator.get_next(direction, route);
-                let distance_to_entry = if route == Route::Right { 300.0 } else { 350.0 };
+                let distance_to_entry = if route == Route::Right { ENTRY_DISTANCE_PX_RIGHT as f64 } else { ENTRY_DISTANCE_PX as f64 };
                 let entry_time = self.crossing_manager.latest_available_time(
                     direction,
                     route,
@@ -85,8 +87,8 @@ impl<'a> Intersection<'a> {
                     car_id.clone(),
                     x,
                     y,
-                    33,
-                    78,
+                    CAR_WIDTH_PX,
+                    CAR_HEIGHT_PX,
                     speed,
                     texture,
                     route,
@@ -98,7 +100,7 @@ impl<'a> Intersection<'a> {
 
                 let datetime: DateTime<Local> = entry_time.into();
                 println!(
-                    "✅ Spawned car {} heading {:?} going {:?} | Entry time: {}",
+                    "Spawned car {} heading {:?} going {:?} | Entry time: {}",
                     car_id,
                     direction,
                     route,
@@ -110,7 +112,7 @@ impl<'a> Intersection<'a> {
 
         // If reached here, no lane available
         println!(
-            "🚫 No free lane found for spawning car in direction {:?}",
+            "No free lane found for spawning car in direction {:?}",
             direction
         );
     }
@@ -133,7 +135,7 @@ impl<'a> Intersection<'a> {
                 let b = &mut right[0];
 
                 if (!a.collided || !b.collided) && a.intersects(b) {
-                    println!("💥 Collision between {} and {}", a.id, b.id);
+                    println!("Collision between {} and {}", a.id, b.id);
                     a.collided = true;
                     b.collided = true;
                     self.collision_count += 1;
@@ -144,7 +146,7 @@ impl<'a> Intersection<'a> {
 
     pub fn update(&mut self) {
         let now = SystemTime::now();
-        let delta = now.duration_since(self.last_update).unwrap_or(Duration::from_millis(16));
+        let delta = now.duration_since(self.last_update).unwrap_or(BASE_DELTA_TIME);
         self.last_update = now;
 
         self.check_cars_collision();
@@ -199,7 +201,7 @@ impl<'a> Intersection<'a> {
         let total = cars.len();
 
         if total == 0 {
-            return "📊 No vehicles have crossed the intersection yet.".to_string();
+            return "No vehicles have crossed the intersection yet.".to_string();
         }
 
         let mut min_speed = f32::MAX;
@@ -264,21 +266,21 @@ impl<'a> Intersection<'a> {
 
 pub fn spawn_position(direction: Direction, route: Route) -> (i32, i32, i32) {
     match (direction, route) {
-        (Direction::South, Route::Left) => (408, -80, 5),
-        (Direction::South, Route::Straight) => (358, -80, 5),
-        (Direction::South, Route::Right) => (308, -80, 7),
+        (Direction::South, Route::Left) => SPAWN_POSITION_SOUTH_LEFT,
+        (Direction::South, Route::Straight) => SPAWN_POSITION_SOUTH_STRAIGHT,
+        (Direction::South, Route::Right) => SPAWN_POSITION_SOUTH_RIGHT,
 
-        (Direction::North, Route::Left) => (458, 900, 5),
-        (Direction::North, Route::Straight) => (508, 900, 5),
-        (Direction::North, Route::Right) => (558, 900, 7),
+        (Direction::North, Route::Left) => SPAWN_POSITION_NORTH_LEFT,
+        (Direction::North, Route::Straight) => SPAWN_POSITION_NORTH_STRAIGHT,
+        (Direction::North, Route::Right) => SPAWN_POSITION_NORTH_RIGHT,
 
-        (Direction::East, Route::Left) => (-80, 458, 5),
-        (Direction::East, Route::Straight) => (-80, 508, 5),
-        (Direction::East, Route::Right) => (-80, 558, 7),
+        (Direction::East, Route::Left) => SPAWN_POSITION_EAST_LEFT,
+        (Direction::East, Route::Straight) => SPAWN_POSITION_EAST_STRAIGHT,
+        (Direction::East, Route::Right) => SPAWN_POSITION_EAST_RIGHT,
 
-        (Direction::West, Route::Left) => (900, 408, 5),
-        (Direction::West, Route::Straight) => (900, 358, 5),
-        (Direction::West, Route::Right) => (900, 308, 7),
+        (Direction::West, Route::Left) => SPAWN_POSITION_WEST_LEFT,
+        (Direction::West, Route::Straight) => SPAWN_POSITION_WEST_STRAIGHT,
+        (Direction::West, Route::Right) => SPAWN_POSITION_WEST_RIGHT,
     }
 }
 

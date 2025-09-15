@@ -6,6 +6,8 @@ use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 use std::time::{Duration, SystemTime};
 
+use crate::consts::*;
+
 pub struct Car<'b> {
     pub id: String,
     pub x: i32,
@@ -30,18 +32,15 @@ pub struct Car<'b> {
 }
 
 impl<'b> Car<'b> {
-    const MAX_SPEED: i32 = 5; // change this to seven for brake testing
-    const ENTRY_DISTANCE_PX: i32 = 350;
-
     pub fn new(
         id: String, x: i32, y: i32, width: u32, height: u32,
         speed: i32, texture: &'b Texture<'b>,
         route: Route, entry_time: SystemTime, direction: Direction,
     ) -> Self {
         let dist = match route {
-            Route::Right => 650,
-            Route::Straight => 900,
-            Route::Left => 950,
+            Route::Right => ROUTE_RIGHT_DISTANCE,
+            Route::Straight => ROUTE_STRAIGHT_DISTANCE,
+            Route::Left => ROUTE_LEFT_DISTANCE,
         };
 
         Car {
@@ -81,7 +80,7 @@ impl<'b> Car<'b> {
     }
 
     pub fn is_too_close(&self, other: &Car) -> bool {
-        let safe_distance = 10; // change this to 20 for brake testing
+        let safe_distance = BRAKE_DISTANCE_PX;
 
         let self_box = self.bounding_box();
         let other_box = other.bounding_box();
@@ -120,10 +119,10 @@ impl<'b> Car<'b> {
 
     pub fn distance_to_entry(&self) -> i32 {
         match self.direction {
-            Direction::North => 900 - self.y,
+            Direction::North => SIMULATION_WINDOW_HEIGHT as i32 - self.y,
             Direction::South => self.y + self.height as i32,
             Direction::East => self.x + self.height as i32,
-            Direction::West => 900 - self.x,
+            Direction::West => SIMULATION_WINDOW_WIDTH as i32 - self.x,
         }
     }
 
@@ -135,6 +134,7 @@ impl<'b> Car<'b> {
             Direction::West => self.x <= 550,
         }
     }
+
     pub fn update(&mut self, delta_time: Duration) {
         if self.exited || self.brake {
             return;
@@ -150,13 +150,13 @@ impl<'b> Car<'b> {
             Direction::North if self.y + self.height as i32 <= 0 => {
                 self.exited = true;
             }
-            Direction::South if self.y >= 900 => {
+            Direction::South if self.y >= SIMULATION_WINDOW_HEIGHT as i32 => {
                 self.exited = true;
             }
             Direction::West if self.x + self.height as i32 <= 0 => {
                 self.exited = true;
             }
-            Direction::East if self.x >= 900 + self.height as i32 => {
+            Direction::East if self.x >= SIMULATION_WINDOW_WIDTH as i32 + self.height as i32 => {
                 self.exited = true;
             }
             _ => {}
@@ -184,7 +184,7 @@ impl<'b> Car<'b> {
                 .unwrap_or_else(|e| e.duration().as_secs_f64());
 
             println!(
-                "🚗 Car {} ENTERED at {}, scheduled: {}, diff: {:.3}s",
+                "Car {} ENTERED at {}, scheduled: {}, diff: {:.3}s",
                 self.id,
                 actual_dt.format("%H:%M:%S%.3f"),
                 scheduled_dt.format("%H:%M:%S%.3f"),
@@ -192,7 +192,7 @@ impl<'b> Car<'b> {
             );
         }
 
-        let distance_to_entry = (Self::ENTRY_DISTANCE_PX - self.distance_to_entry()).max(0);
+        let distance_to_entry = (ENTRY_DISTANCE_PX - self.distance_to_entry()).max(0);
         let time_left = self
             .entry_time
             .duration_since(now)
@@ -202,19 +202,18 @@ impl<'b> Car<'b> {
         let speed_px_per_sec = if time_left > 0.0 {
             distance_to_entry as f64 / time_left
         } else {
-            (Self::MAX_SPEED * 60) as f64
+            SPEED_PX_PER_SEC
         };
 
         let target_speed = (speed_px_per_sec).round() as i32;
-        let max_acceleration = 30;
 
         if self.speed < target_speed {
-            self.speed = (self.speed + max_acceleration).min(target_speed).min(Self::MAX_SPEED * 60);
+            self.speed = (self.speed + MAX_ACCELERATION).min(target_speed).min(SPEED_PX_PER_SEC as i32);
         } else if self.speed > target_speed {
-            self.speed = (self.speed - max_acceleration).max(target_speed).max(0);
+            self.speed = (self.speed - MAX_ACCELERATION).max(target_speed).max(0);
         }
 
-        if self.route == Route::Right { self.speed = 6 * 60 }
+        if self.route == Route::Right { self.speed = SPEED_PX_PER_SEC as i32 }
         let distance = (self.speed as f64 * seconds).round() as i32;
 
         match self.direction {
@@ -230,7 +229,7 @@ impl<'b> Car<'b> {
         let distance = (self.speed as f64 * seconds).round() as i32;
         let distance_forward = self.distance_to_entry();
 
-        if self.turned || distance_forward < 350 {
+        if self.turned || distance_forward < RIGHT_TURN_ENTRY_DISTANCE_PX {
             self.update_straight(delta_time);
         } else {
             match self.direction {
@@ -242,7 +241,7 @@ impl<'b> Car<'b> {
                 Direction::South => {
                     self.direction = Direction::West;
                     self.y = 308;
-                    self.x -= 40 - distance;
+                    self.x -= (CAR_HEIGHT_PX/2) as i32 - distance;
                 }
                 Direction::East => {
                     self.direction = Direction::South;
@@ -252,7 +251,7 @@ impl<'b> Car<'b> {
                 Direction::West => {
                     self.direction = Direction::North;
                     self.x = 558;
-                    self.y -= 40 - distance;
+                    self.y -= (CAR_HEIGHT_PX/2) as i32 - distance;
                 }
             }
             self.turned = true;
@@ -265,14 +264,14 @@ impl<'b> Car<'b> {
         let distance = (self.speed as f64 * seconds).round() as i32;
         let distance_forward = self.distance_to_entry();
 
-        if self.turned || distance_forward < 500 {
+        if self.turned || distance_forward < LEFT_TURN_ENTRY_DISTANCE_PX {
             self.update_straight(delta_time);
         } else {
             match self.direction {
                 Direction::North => {
                     self.direction = Direction::West;
                     self.y = 408;
-                    self.x -= 40 - distance;
+                    self.x -= (CAR_HEIGHT_PX/2) as i32 - distance;
                 }
                 Direction::South => {
                     self.direction = Direction::East;
@@ -282,7 +281,7 @@ impl<'b> Car<'b> {
                 Direction::East => {
                     self.direction = Direction::North;
                     self.x = 458;
-                    self.y -= 40 - distance;
+                    self.y -= (CAR_HEIGHT_PX/2) as i32 - distance;
                 }
                 Direction::West => {
                     self.direction = Direction::South;
@@ -317,13 +316,13 @@ impl<'b> Car<'b> {
             .unwrap();
 
         if self.collided {
-            canvas.set_draw_color(Color::RGB(255, 0, 255)); // 💥 Magenta for collision
+            canvas.set_draw_color(Color::MAGENTA); // Magenta for collision
         } else if self.brake {
-            canvas.set_draw_color(Color::RGB(255, 0, 0)); // Green for active
+            canvas.set_draw_color(Color::RED); // Red for active
         } else if !self.in_intersection {
-            canvas.set_draw_color(Color::RGB(255, 255, 0)); // Yellow for waiting
+            canvas.set_draw_color(Color::YELLOW); // Yellow for waiting
         } else {
-            canvas.set_draw_color(Color::RGB(0, 0, 255)); // Green for active
+            canvas.set_draw_color(Color::BLUE); // Blue for active
         }
         canvas.draw_rect(self.bounding_box()).unwrap();
 

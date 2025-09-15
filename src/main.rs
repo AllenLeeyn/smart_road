@@ -1,5 +1,6 @@
 mod car;
 mod cars_id;
+mod consts;
 mod intersection;
 mod crossing_manager;
 use intersection::{Intersection, Direction, Route};
@@ -8,20 +9,22 @@ use sdl2::image::{InitFlag, LoadTexture};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::render::Texture;
-use std::time::Duration;
 use std::collections::HashMap;
- 
+
+use crate::consts::*;
+
+
 pub fn main() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
-    
+
     let _img_ctx = sdl2::image::init(InitFlag::PNG);
- 
-    let window = video_subsystem.window("smart-road", 900, 900)
+
+    let window = video_subsystem.window("smart-road", SIMULATION_WINDOW_WIDTH, SIMULATION_WINDOW_HEIGHT)
         .position_centered()
         .build()
         .unwrap();
- 
+
     let mut canvas = window.into_canvas().build().unwrap();
     
     // Load the background texture
@@ -42,7 +45,7 @@ pub fn main() {
 
     use std::time::Instant;
 
-    let target_frame_duration = Duration::from_millis(1000 / 60); // ~16.67ms
+    let target_frame_duration = BASE_DELTA_TIME;
 
     'running: loop {
         let frame_start = Instant::now();
@@ -108,7 +111,7 @@ fn show_statistics(
     let ttf_context = sdl2::ttf::init().unwrap();
 
     let window = video_subsystem
-        .window("Statistics", 400, 400)
+        .window("Statistics", STATS_WINDOW_WIDTH, STATS_WINDOW_HEIGHT)
         .position_centered()
         .build()
         .unwrap();
@@ -117,7 +120,7 @@ fn show_statistics(
     let texture_creator = canvas.texture_creator();
 
     let font_path = "assets/Roboto-Regular.ttf"; // Change if needed
-    let font: Font = ttf_context.load_font(font_path, 20).unwrap();
+    let font: Font = ttf_context.load_font(font_path, FONT_SIZE).unwrap();
 
     let stats_text = intersection.get_statistics(); // should return String
 
@@ -127,9 +130,9 @@ fn show_statistics(
         .unwrap();
 
     let texture = texture_creator.create_texture_from_surface(&surface).unwrap();
-    let target = Rect::new(10, 10, surface.width(), surface.height());
+    let target = Rect::new(UI_PADDING_X, UI_PADDING_Y, surface.width(), surface.height());
 
-    canvas.set_draw_color(Color::RGB(30, 30, 30));
+    canvas.set_draw_color(BACKGROUND_COLOR);
     canvas.clear();
     canvas.copy(&texture, None, Some(target)).unwrap();
     canvas.present();

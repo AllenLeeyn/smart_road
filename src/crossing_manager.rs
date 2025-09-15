@@ -6,11 +6,7 @@ use sdl2::rect::Rect;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
 
-const ZONE_LENGTH_PX: f64 = 50.0;
-const CAR_LENGTH_PX: f64 = 78.0;
-const MAX_SPEED: f64 = 5.0;
-const SPEED_PX_PER_SEC: f64 = MAX_SPEED * 60.0;
-const SAFE_DISTANCE_PX: f64 = CAR_LENGTH_PX/2.0;
+use crate::consts::*;
 
 pub type ZoneIndex = (usize, usize);
 
@@ -42,7 +38,7 @@ impl CrossingManager {
         let now = SystemTime::now();
 
         let zone_time = Duration::from_secs_f64(ZONE_LENGTH_PX / SPEED_PX_PER_SEC);
-        let car_occupy_time = Duration::from_secs_f64(CAR_LENGTH_PX / SPEED_PX_PER_SEC);
+        let car_occupy_time = Duration::from_secs_f64(CAR_HEIGHT_PX as f64 / SPEED_PX_PER_SEC);
         let safe_time_gap = Duration::from_secs_f64(SAFE_DISTANCE_PX / SPEED_PX_PER_SEC);
         let travel_time = Duration::from_secs_f64(distance_to_entry / SPEED_PX_PER_SEC);
 
@@ -93,13 +89,13 @@ impl CrossingManager {
     }
 
     pub fn draw(&self, canvas: &mut Canvas<Window>) -> Result<(), String> {
-        let rect = Rect::new(300, 300, 300, 300);
-        canvas.set_draw_color(Color::RGB(128, 128, 128));
+        let rect = Rect::new(INTERSECTION_START_X - 50, INTERSECTION_START_Y - 50, INTERSECTION_RECT_SIZE as u32, INTERSECTION_RECT_SIZE as u32);
+        canvas.set_draw_color(INTERSECTION_COLOR);
         canvas.draw_rect(rect)?;
 
         let zone_size = ZONE_LENGTH_PX as i32;
-        let start_x = 350;
-        let start_y = 350;
+        let start_x = INTERSECTION_START_X;
+        let start_y = INTERSECTION_START_Y;
         let now = SystemTime::now();
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -128,9 +124,9 @@ impl CrossingManager {
                 let color = if has_active {
                     Color::RGB(160, 32, 240) // Purple (active)
                 } else if has_any {
-                    Color::RGB(255, 0, 0)    // Red (reserved, but inactive)
+                    Color::RED // Red (reserved, but inactive)
                 } else {
-                    Color::RGB(0, 255, 0)    // Green (free)
+                    Color::GREEN // Green (free)
                 };
 
                 canvas.set_draw_color(color);
@@ -144,25 +140,17 @@ impl CrossingManager {
 
 fn route_to_zone_path(dir: Direction, route: Route) -> Vec<ZoneIndex> {
     match (dir, route) {
-        (Direction::South, Route::Left) => vec![
-            (0,1), (1,1), (2,1), (2,2), (2,3)],
-        (Direction::South, Route::Straight) => vec![
-            (0,0), (1,0), (2,0), (3,0)],
+        (Direction::South, Route::Left) => ZONES_FOR_SOUTH_LEFT.to_vec(),
+        (Direction::South, Route::Straight) => ZONES_FOR_SOUTH_STRAIGHT.to_vec(),
 
-        (Direction::North, Route::Left) => vec![
-            (3,2), (2,2), (1,2), (1,1), (1,0)],
-        (Direction::North, Route::Straight) => vec![
-            (3,3), (2,3), (1,3), (0,3)],
+        (Direction::North, Route::Left) => ZONES_FOR_NORTH_LEFT.to_vec(),
+        (Direction::North, Route::Straight) => ZONES_FOR_NORTH_STRAIGHT.to_vec(),
 
-        (Direction::East, Route::Left)  => vec![
-            (2,0), (2,1), (2,2), (1,2), (0,2)],
-        (Direction::East, Route::Straight) => vec![
-            (3,0), (3,1), (3,2), (3,3)],
+        (Direction::East, Route::Left)  => ZONES_FOR_EAST_LEFT.to_vec(),
+        (Direction::East, Route::Straight) => ZONES_FOR_EAST_STRAIGHT.to_vec(),
 
-        (Direction::West, Route::Left) => vec![
-            (1,3), (1,2), (1,1), (2,1), (3,1)],
-        (Direction::West, Route::Straight) => vec![
-            (0,3), (0,2), (0,1), (0,0)],
+        (Direction::West, Route::Left) => ZONES_FOR_WEST_LEFT.to_vec(),
+        (Direction::West, Route::Straight) => ZONES_FOR_WEST_STRAIGHT.to_vec(),
 
         (_, Route::Right) => vec![],
     }
@@ -174,7 +162,7 @@ pub fn generate_zone_reservations(
     entry_time: SystemTime,
 ) -> Vec<(ZoneIndex, ZoneReservation)> {
     let zone_time = Duration::from_secs_f64(ZONE_LENGTH_PX / SPEED_PX_PER_SEC);
-    let occupy_time = Duration::from_secs_f64(CAR_LENGTH_PX / SPEED_PX_PER_SEC);
+    let occupy_time = Duration::from_secs_f64(CAR_HEIGHT_PX as f64 / SPEED_PX_PER_SEC);
     let safe_gap = Duration::from_secs_f64(SAFE_DISTANCE_PX / SPEED_PX_PER_SEC);
 
     let mut reservations = Vec::new();
