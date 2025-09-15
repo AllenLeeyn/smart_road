@@ -23,7 +23,7 @@ The project is implemented in Rust with real-time visualization using SDL2, prov
    ```
 
 ## User Guide
-[Watch demo video](./vid.mp4)
+![Watch demo](./example.gif)
 - The simulation window will open, displaying the intersection and vehicles.
 - To generate a new vehicle, press the the appropriate key:
   - `W` | `Arrow Up`: Spawn a vehicle at the bottom heading North
@@ -72,6 +72,11 @@ This simulation makes several simplifying assumptions to focus on demonstrating 
 ### Environment Constraints
 - **No Pedestrians or Mixed Traffic**: The simulation handles only autonomous vehicles. There are no pedestrians, bicycles, human-driven vehicles, or traffic signals.
 - **Single Intersection Only**: The simulation models only a single 4-way intersection. Expanding this to a city grid or multiple connected intersections would require major architectural changes.
+
+### Challenges
+- **Stratgy**: We tried two different strategies (time slot allocation and a yielding system) before settling on one.
+- **Speed calculation and time slot calculation missmatch**: We originally handle speed calculation/ position update with px/frames. But time slot allocation is done using duration based on seconds. Under ideal scenario where frames are updated consistently at 60fps, this mismatch won't cause much problem. But a slight consistent drop in framerate for a few seconds is enough to cause the car to not update it position properly that result in a collision. We switch position update and speed to be time based.
+- **Animating curve turns**: Car struct x and y points to top left corner as that is how sdl2 `rect` is drawn. However, the rotation of the texture is around the center of the `rect`. This results in the texture drawn in an unintended location. The logical approach is to rewrite the car struct with methods to handle the bounding box tracking, rotation and texture drawing. But we attempted this at the later stage of the project and decided to focus on other projects.
 
 ## Collaborators 
 - Allen [@AllenLeeyn](https://github.com/AllenLeeyn)
